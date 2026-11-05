@@ -20,7 +20,9 @@
     "./openapi/*": "./openapi/*.ts",
     "./openapi/spec.json": "./openapi/openapi.json",
     "./mcp": "./mcp/index.ts",
-    "./mcp/*": "./mcp/*.ts"
+    "./mcp/*": "./mcp/*.ts",
+    "./client": "./client/index.ts",
+    "./client/*": "./client/*.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",

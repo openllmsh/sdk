@@ -16,7 +16,28 @@ import { ChatCompletionRequest } from "@openllmsh/sdk/protocol";
 import { anthropicToOpenAI } from "@openllmsh/sdk/wire/adapters/messages";
 import { isValidMuxFrame } from "@openllmsh/sdk/tunnel/codec";
 import { sealCliAuth, parseApiKey } from "@openllmsh/sdk/vault";
+import { createClient } from "@openllmsh/sdk/client";
 ```
+
+### Client quickstart (vault session)
+
+```ts
+const ollm = createClient({
+  origin: "https://openllm.sh",
+  apiKey, // sk-llm-…
+  transport: { fetch, websocket: WebSocket },
+});
+
+// Unwrap the DEK when you already have the server's dek_for_key blob:
+await ollm.vault.unlockFromApiKey(dekForKeyB64);
+const sealed = await ollm.vault.sealToDevice(devicePubSpkiB64, secret);
+const enc = await ollm.vault.encryptCredential(JSON.stringify(creds));
+ollm.close(); // zeros the DEK
+```
+
+Browser hosts can pass an already-unlocked DEK via `{ dek }` (PIN/passkey
+glue stays in the app). HTTP `/v1` and device tunnels land next on the same
+`createClient` object.
 
 ## Subpaths
 
@@ -29,12 +50,13 @@ import { sealCliAuth, parseApiKey } from "@openllmsh/sdk/vault";
 | `@openllmsh/sdk/openapi` | Committed OpenAPI spec + operations table + `callOperation()`. |
 | `@openllmsh/sdk/openapi/spec.json` | The sanitized OpenAPI document (same sanitize as `/api/swagger`). |
 | `@openllmsh/sdk/mcp` | MCP tool defs (native API, memory, HTTP marketplace upstreams) and `createMcpServer` over an injected transport. |
+| `@openllmsh/sdk/client` | I/O-injected facade: vault session today; HTTP + device tunnel next. Composition only — no new crypto. |
 
 ## Licence
 
 | Path | Licence |
 | --- | --- |
-| `protocol/`, `openapi/`, `mcp/` (and the package root) | Apache-2.0 |
+| `protocol/`, `openapi/`, `mcp/`, `client/` (and the package root) | Apache-2.0 |
 | `wire/` | BUSL-1.1 |
 | `tunnel/` | BUSL-1.1 |
 | `vault/` | BUSL-1.1 |

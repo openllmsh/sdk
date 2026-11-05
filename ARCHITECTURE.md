@@ -1,6 +1,6 @@
 # `@openllmsh/sdk` architecture
 
-One workspace package, six internal layers. Boundaries that used to be
+One workspace package, seven internal layers. Boundaries that used to be
 enforced by separate `package.json` deps are enforced by
 `tests/sdk/layering.test.ts`.
 
@@ -9,6 +9,7 @@ protocol  ←  wire
           ←  tunnel  ←  vault
           ←  openapi
 openapi + protocol  ←  mcp
+any SDK layer       ←  client   (no node:*)
 ```
 
 | Folder | May import | Detail |
@@ -19,7 +20,8 @@ openapi + protocol  ←  mcp
 | `tunnel/codec*`, `tunnel/channel-envelope` | nothing outside themselves | Relay-safe subpaths. |
 | `vault/` | `@openllmsh/sdk/protocol`, `@openllmsh/sdk/tunnel`, `@noble/ed25519`, `@scure/bip39`, `hash-wasm` | Zero-knowledge crypto. See `vault/ARCHITECTURE.md`. |
 | `openapi/` | `@openllmsh/sdk/protocol` (+ committed JSON) | Spec + operations table + `callOperation`. |
-| `mcp/` | `@openllmsh/sdk/openapi`, `@openllmsh/sdk/protocol`, `@modelcontextprotocol/server` | Tool defs + `createMcpServer`; no `node:*`. |
+| `mcp/` | `@openllmsh/sdk/openapi`, `@openllmsh/sdk/protocol`, `@openllmsh/sdk/client`, `@modelcontextprotocol/server` | Tool defs + `createMcpServer`; no `node:*`. |
+| `client/` | any SDK layer; no `node:*` | I/O-injected facade (`createClient`): vault session, then HTTP, then device tunnel. |
 
 Rules that apply to every folder:
 
