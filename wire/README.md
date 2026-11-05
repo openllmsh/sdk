@@ -25,13 +25,13 @@ daemon both run:
 - the single upstream-request builder (model/stream pinning, Anthropic
   adaptive-thinking + `anthropic-beta`)
 
-Depends only on [`@openllmsh/sdk/protocol`](https://github.com/openllmsh/protocol)
+Depends only on [`@openllmsh/sdk/protocol`](https://github.com/openllmsh/sdk)
 + `effect`.
 
 ## Install
 
 ```sh
-bun install github:openllmsh/wire # latest
+bun install github:openllmsh/sdk#<tag>
 ```
 
 ```ts

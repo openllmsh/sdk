@@ -24,12 +24,12 @@ implementation, no timers, no crypto transport:
 - per-stream credits, lifecycle, parity, backpressure
 - device-grant encode/decode and RTC fingerprint-binding shapes
 
-Depends only on [`@openllmsh/sdk/protocol`](https://github.com/openllmsh/protocol).
+Depends only on [`@openllmsh/sdk/protocol`](https://github.com/openllmsh/sdk).
 
 ## Install
 
 ```sh
-bun install github:openllmsh/tunnel # latest
+bun install github:openllmsh/sdk#<tag>
 ```
 
 ## License

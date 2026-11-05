@@ -8,7 +8,7 @@
 <p align="center"><b>protocol</b> — the public protocol surface for OpenLLM.</p>
 
 <p align="center">
-  <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green.svg"></a>
+  <a href="../LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue.svg"></a>
   <img alt="deps: effect only" src="https://img.shields.io/badge/deps-effect%20only-blue.svg">
 </p>
 
@@ -32,7 +32,7 @@ third-party OpenLLM client against this and nothing else.
 ## Install
 
 ```sh
-bun install github:openllmsh/protocol # latest
+bun install github:openllmsh/sdk#<tag>
 ```
 
 ```ts
@@ -125,7 +125,7 @@ unknown (older daemon, keychain-backed store, unreadable file), not signed out.
 
 ## License
 
-[MIT](./LICENSE) © OpenLLM, INC.
+[Apache-2.0](../LICENSE) © OpenLLM, INC.
 
 ---
 

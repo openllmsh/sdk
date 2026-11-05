@@ -1,11 +1,13 @@
 /**
- * `/v1/chat/completions` convenience on the client. Non-stream calls go
- * through `callOperation`; stream calls use authenticated `request` so the
- * SSE body stays a live ReadableStream.
+ * `/v1/chat/completions` convenience on the client. Stream and non-stream both
+ * use authenticated `request` so signal / headers / timeout behave the same and
+ * the caller always gets a live `Response` (SSE body or JSON body).
  */
 
-import type { TSdkResponse } from "@openllmsh/sdk/openapi";
 import type { TClientHttp } from "./http";
+
+/** Default request ceiling — matches `openapi/call.ts` `REQUEST_TIMEOUT_MS`. */
+export const DEFAULT_CHAT_TIMEOUT_MS = 120_000;
 
 export type TChatCompletionCreateBody = {
   readonly model: string;
@@ -16,9 +18,10 @@ export type TChatCompletionCreateBody = {
 
 export type TChatCompletions = {
   /**
-   * Create a chat completion. When `body.stream === true`, returns the raw
-   * `Response` (caller consumes SSE). Otherwise returns a parsed
-   * `TSdkResponse` from `callOperation`.
+   * Create a chat completion. Always returns the raw `Response` — when
+   * `body.stream === true` the body is an SSE stream; otherwise JSON.
+   * Honours `signal`, merges `headers` via `Headers`, and applies
+   * `timeoutMs` (default {@link DEFAULT_CHAT_TIMEOUT_MS}) on both paths.
    */
   readonly create: (
     body: TChatCompletionCreateBody,
@@ -27,37 +30,47 @@ export type TChatCompletions = {
       readonly headers?: HeadersInit;
       readonly timeoutMs?: number;
     },
-  ) => Promise<Response | TSdkResponse>;
+  ) => Promise<Response>;
 };
 
 export type TClientChat = {
   readonly completions: TChatCompletions;
 };
 
+const mergeHeaders = (base: HeadersInit, extra?: HeadersInit): Headers => {
+  const headers = new Headers(base);
+  if (extra !== undefined) {
+    new Headers(extra).forEach((value, key) => {
+      headers.set(key, value);
+    });
+  }
+  return headers;
+};
+
+const resolveSignal = (
+  timeoutMs: number | undefined,
+  signal: AbortSignal | undefined,
+): AbortSignal => {
+  const timeout = AbortSignal.timeout(timeoutMs ?? DEFAULT_CHAT_TIMEOUT_MS);
+  return signal !== undefined ? AbortSignal.any([signal, timeout]) : timeout;
+};
+
 export const createClientChat = (http: TClientHttp): TClientChat => ({
   completions: {
-    create: async (body, options = {}): Promise<Response | TSdkResponse> => {
-      if (body.stream === true) {
-        return http.request("/v1/chat/completions", {
-          method: "POST",
-          headers: {
+    create: async (body, options = {}): Promise<Response> => {
+      const streaming = body.stream === true;
+      return http.request("/v1/chat/completions", {
+        method: "POST",
+        headers: mergeHeaders(
+          {
             "content-type": "application/json",
-            accept: "text/event-stream",
-            ...(options.headers ?? {}),
+            ...(streaming ? { accept: "text/event-stream" } : {}),
           },
-          body: JSON.stringify(body),
-          ...(options.signal !== undefined ? { signal: options.signal } : {}),
-        });
-      }
-      return http.call(
-        "v1ChatCompletions.chatCompletions",
-        { body },
-        {
-          ...(options.timeoutMs !== undefined
-            ? { timeoutMs: options.timeoutMs }
-            : {}),
-        },
-      );
+          options.headers,
+        ),
+        body: JSON.stringify(body),
+        signal: resolveSignal(options.timeoutMs, options.signal),
+      });
     },
   },
 });

@@ -55,9 +55,12 @@ export * from "./semver";
 export * from "./setup-mode";
 export * from "./stats";
 export * from "./streaming";
-export * from "./subscription-daemon-floors";
+// Floors + compat are control-plane / dashboard only — keep them OFF this
+// barrel so the CLI/daemon binary closure never pulls publish-time pin
+// metadata in via `import … from "@openllmsh/sdk/protocol"`. Import the
+// dedicated subpaths (`…/subscription-daemon-floors`,
+// `…/subscription-provider-compat`) from the browser / schema / release.
 export * from "./subscription-provider";
-export * from "./subscription-provider-compat";
 export * from "./team-grant";
 export * from "./team-shareable";
 export * from "./transcription-encoding";

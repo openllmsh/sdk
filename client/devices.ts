@@ -8,28 +8,16 @@
 
 import type { TMuxChannel } from "@openllmsh/sdk/tunnel/mux";
 import { isStreamResetError } from "@openllmsh/sdk/tunnel/stream-reset-error";
-import type { TRelayMuxDependencies } from "./relay-mux";
-import { dropChannelForKey, getOrOpenMuxChannel } from "./relay-mux";
+import type { TRelayMux, TRelayMuxDependencies } from "./relay-mux";
+import { createRelayMux } from "./relay-mux";
 
 export type {
   TMuxChannelState,
   TMuxPhase,
+  TRelayMux,
   TRelayMuxDependencies,
 } from "./relay-mux";
-export {
-  clearMuxFailureForKey,
-  clearMuxState,
-  dropChannelForKey,
-  dropGrantlessMuxChannelForKey,
-  failAllMuxChannels,
-  getMuxChannelState,
-  getOrOpenMuxChannel,
-  muxChannelOpenedWithGrant,
-  onRelayBinary,
-  onRelayChannelAck,
-  onRelayChannelClose,
-  subscribeMuxState,
-} from "./relay-mux";
+export { createRelayMux } from "./relay-mux";
 
 /** Shared open budget for a session open across RTC + mux rungs. */
 export const SESSION_OPEN_TIMEOUT_MS = 15_000;
@@ -217,38 +205,64 @@ export type TClientDevice = {
 export type TClientDevicesHost = {
   readonly mux: TRelayMuxDependencies;
   readonly ladder: TSessionLadderDeps;
+  /**
+   * Optional shared mux store (e.g. the browser app singleton). When omitted,
+   * {@link createClientDevices} creates a private instance.
+   */
+  readonly relayMux?: TRelayMux;
 };
 
 export type TClientDevices = {
   readonly open: (deviceId: string) => TClientDevice;
+  /** The mux store this facade uses — host glue may feed relay frames into it. */
+  readonly relayMux: TRelayMux;
+  /** Tear down every mux channel this facade owns. Idempotent. */
+  readonly close: () => void;
 };
 
 export const createClientDevices = (
   host: TClientDevicesHost,
-): TClientDevices => ({
-  open: (deviceId: string): TClientDevice => ({
-    deviceId,
-    openMux: (options = {}): Promise<TMuxChannel | null> =>
-      getOrOpenMuxChannel(
-        deviceId,
-        host.mux,
-        options.timeoutMs,
-        options.signal,
-      ),
-    openOverLadder: <R>(
-      attempt: (
-        channel: TMuxChannel,
-        timeoutMs: number,
-        path: "rtc" | "mux",
-      ) => Promise<R>,
-      overrides: Partial<TSessionLadderDeps> = {},
-    ): Promise<R> =>
-      openOverMuxLadder(deviceId, attempt, {
-        ...host.ladder,
-        ...overrides,
-      }),
+): TClientDevices => {
+  const ownsMux = host.relayMux === undefined;
+  const relayMux = host.relayMux ?? createRelayMux();
+  const opened = new Set<string>();
+  return {
+    relayMux,
+    open: (deviceId: string): TClientDevice => ({
+      deviceId,
+      openMux: (options = {}): Promise<TMuxChannel | null> => {
+        opened.add(deviceId);
+        return relayMux.getOrOpenMuxChannel(
+          deviceId,
+          host.mux,
+          options.timeoutMs,
+          options.signal,
+        );
+      },
+      openOverLadder: <R>(
+        attempt: (
+          channel: TMuxChannel,
+          timeoutMs: number,
+          path: "rtc" | "mux",
+        ) => Promise<R>,
+        overrides: Partial<TSessionLadderDeps> = {},
+      ): Promise<R> =>
+        openOverMuxLadder(deviceId, attempt, {
+          ...host.ladder,
+          ...overrides,
+        }),
+      close: (): void => {
+        opened.delete(deviceId);
+        relayMux.dropChannelForKey(deviceId);
+      },
+    }),
     close: (): void => {
-      dropChannelForKey(deviceId);
+      if (ownsMux) {
+        relayMux.failAllMuxChannels("client closed");
+      } else {
+        for (const deviceId of opened) relayMux.dropChannelForKey(deviceId);
+      }
+      opened.clear();
     },
-  }),
-});
+  };
+};

@@ -88,10 +88,13 @@ export type TClientVault = {
   >;
   readonly importCliAuthPrivateKey: (pkcs8B64: string) => Promise<CryptoKey>;
   readonly mintApiKey: (vaultVersion: number) => Promise<TMintedApiKey>;
-  readonly parseApiKey: () => {
-    readonly id: string;
-    readonly secret: Uint8Array;
-  } | null;
+  /**
+   * Borrow a private copy of the API-key secret. The copy is `zero()`ed when
+   * `fn` settles. Returns `{ ok: false }` when no valid key was configured.
+   */
+  readonly withApiKeySecret: <T>(
+    fn: (secret: Uint8Array, id: string) => T | Promise<T>,
+  ) => Promise<TDekBorrow<T>>;
   /** Zero the held DEK (and any retained API-key secret). Idempotent. */
   readonly close: () => void;
 };
@@ -136,11 +139,6 @@ export const createClientVault = (
     }
   };
 
-  const requireDek = (): Uint8Array => {
-    if (dek === null) throw lockedError("use the DEK");
-    return dek;
-  };
-
   const withDek = async <T>(
     fn: (d: Uint8Array) => T | Promise<T>,
   ): Promise<TDekBorrow<T>> => {
@@ -148,6 +146,19 @@ export const createClientVault = (
     const copy = new Uint8Array(dek);
     try {
       const value = await fn(copy);
+      return { ok: true, value };
+    } finally {
+      zero(copy);
+    }
+  };
+
+  const withApiKeySecret = async <T>(
+    fn: (secret: Uint8Array, id: string) => T | Promise<T>,
+  ): Promise<TDekBorrow<T>> => {
+    if (parsed === null || apiKeySecret === null) return { ok: false };
+    const copy = new Uint8Array(apiKeySecret);
+    try {
+      const value = await fn(copy, parsed.id);
       return { ok: true, value };
     } finally {
       zero(copy);
@@ -177,13 +188,21 @@ export const createClientVault = (
     withDek,
     encryptCredential: async (
       plaintext: string,
-    ): Promise<TEncryptedCredential> =>
-      encryptCredential(requireDek(), plaintext),
+    ): Promise<TEncryptedCredential> => {
+      const borrowed = await withDek((d) => encryptCredential(d, plaintext));
+      if (!borrowed.ok) throw lockedError("encrypt a credential");
+      return borrowed.value;
+    },
     decryptCredential: async (
       ciphertextB64: string,
       nonceB64: string,
-    ): Promise<string> =>
-      decryptCredential(requireDek(), ciphertextB64, nonceB64),
+    ): Promise<string> => {
+      const borrowed = await withDek((d) =>
+        decryptCredential(d, ciphertextB64, nonceB64),
+      );
+      if (!borrowed.ok) throw lockedError("decrypt a credential");
+      return borrowed.value;
+    },
     sealToDevice: (
       recipientPubSpkiB64: string,
       plaintext: string,
@@ -209,10 +228,7 @@ export const createClientVault = (
       if (!borrowed.ok) throw lockedError("mint an API key");
       return borrowed.value;
     },
-    parseApiKey: () => {
-      if (parsed === null || apiKeySecret === null) return null;
-      return { id: parsed.id, secret: new Uint8Array(apiKeySecret) };
-    },
+    withApiKeySecret,
     close: (): void => {
       clearDek();
       clearSecret();
