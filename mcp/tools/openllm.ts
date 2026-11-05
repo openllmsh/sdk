@@ -223,6 +223,17 @@ const AGENT_FORBIDDEN_PATHS: ReadonlySet<string> = new Set([
   "/connect/grants/reconsent",
   "/connect/grants/pickup",
   "/connect/grants/revoke",
+  // Connections → Your apps: making an app or a new secret returns the
+  // client secret, and deleting one cuts off every person connected to it.
+  // The developer's own act, in the browser.
+  "/developer/apps",
+  "/developer/apps/{client_id}",
+  "/developer/apps/{client_id}/secret",
+  "/developer/apps/{client_id}/sealed",
+  // Asking OpenLLM to review an app (and reading those applications) speaks
+  // for the developer to OpenLLM's team; also the developer's own act.
+  "/developer/apps/{client_id}/review",
+  "/developer/applications",
   // CLI OpenLLM OAuth approval (`/cli/authorize/[id]`): viewing, approving or
   // denying a waiting CLI login hands an account key to a terminal (or refuses
   // it). That is the signed-in user's act in the browser; as a web-chat tool it
