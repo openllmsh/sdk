@@ -33916,7 +33916,6 @@
                 "properties": {
                   "name": {
                     "type": "string",
-                    "minLength": 1,
                     "maxLength": 64
                   },
                   "homepage_url": {
@@ -34672,7 +34671,6 @@
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 1,
                         "maxLength": 64
                       },
                       {
@@ -37000,7 +36998,6 @@
                 "properties": {
                   "description": {
                     "type": "string",
-                    "minLength": 1,
                     "maxLength": 1000
                   }
                 },
@@ -38111,7 +38108,6 @@
                   },
                   "name": {
                     "type": "string",
-                    "minLength": 1,
                     "maxLength": 64
                   },
                   "homepage_url": {
@@ -38139,7 +38135,6 @@
                   },
                   "description": {
                     "type": "string",
-                    "minLength": 1,
                     "maxLength": 1000
                   },
                   "logo_url": {
