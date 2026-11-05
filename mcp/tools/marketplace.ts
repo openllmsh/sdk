@@ -57,9 +57,12 @@ type TChannel = {
 };
 
 const PROTOCOL_VERSION = "2025-06-18";
-const CONNECT_TIMEOUT_MS = 5_000;
-const CALL_TIMEOUT_MS = 120_000;
 const MAX_TOOL_PAGES = 10;
+
+/** Upstream MCP initialize / tools/list dial timeout. */
+export const CONNECT_TIMEOUT_MS = 5_000;
+/** Upstream MCP tools/call timeout. */
+export const CALL_TIMEOUT_MS = 120_000;
 
 /** Bound for `/api/marketplace/launch` and for the MCP factory wait on it. */
 export const LAUNCH_TIMEOUT_MS = 5_000;

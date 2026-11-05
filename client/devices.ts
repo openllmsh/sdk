@@ -12,6 +12,7 @@ import type { TRelayMux, TRelayMuxDependencies } from "./relay-mux";
 import { createRelayMux } from "./relay-mux";
 
 export type {
+  TCreateRelayMuxOptions,
   TMuxChannelState,
   TMuxPhase,
   TRelayMux,

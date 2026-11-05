@@ -39,6 +39,8 @@ export type {
   TUpstreamTool,
 } from "./tools/marketplace";
 export {
+  CALL_TIMEOUT_MS,
+  CONNECT_TIMEOUT_MS,
   connectUpstream,
   connectUpstreams,
   fetchMarketplaceLaunch,

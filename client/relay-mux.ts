@@ -5,8 +5,9 @@ import {
 } from "@openllmsh/sdk/tunnel/channel-envelope";
 import type { TDuplex, TMuxChannel } from "@openllmsh/sdk/tunnel/mux";
 import { createChannel } from "@openllmsh/sdk/tunnel/mux";
+import type { TPeerLinkFailureCache } from "@openllmsh/sdk/tunnel/peer-link";
 import {
-  peerLinkFailureCache,
+  createPeerLinkFailureCache,
   peerLinkFailureReasonOf,
 } from "@openllmsh/sdk/tunnel/peer-link";
 
@@ -101,11 +102,26 @@ export type TRelayMux = {
   readonly clearMuxState: () => void;
 };
 
+export type TCreateRelayMuxOptions = {
+  /**
+   * Negative cache for this mux instance's opens. Defaults to a fresh cache so
+   * two `createRelayMux()` clients never share failure state. RTC host glue
+   * (`lib/stores/rtc-channel.ts`) and `createPeerLink` keep the process-global
+   * `peerLinkFailureCache` for the RTC rung — only the mux maps are scoped
+   * here. The browser app singleton (`lib/stores/relay-mux.ts`) is still one
+   * instance, so in-tab mux failure behaviour matches the old module singleton.
+   */
+  readonly failureCache?: TPeerLinkFailureCache;
+};
+
 /**
  * Per-client relay-mux state. Two clients must not share channel maps — create
  * one instance per client (or one app-wide singleton in host glue).
  */
-export const createRelayMux = (): TRelayMux => {
+export const createRelayMux = (
+  options: TCreateRelayMuxOptions = {},
+): TRelayMux => {
+  const failureCache = options.failureCache ?? createPeerLinkFailureCache();
   const channelsByKey = new Map<string, TActiveChannel>();
   const channelsById = new Map<string, TActiveChannel>();
   /**
@@ -134,7 +150,7 @@ export const createRelayMux = (): TRelayMux => {
     const failure = peerLinkFailureReasonOf(
       new Error(reason ?? "relay transport failure"),
     );
-    peerLinkFailureCache.set(keyId, "mux", failure);
+    failureCache.set(keyId, "mux", failure);
     if (reason !== undefined && reason.length > 0) {
       stickyLastError.set(keyId, reason);
     }
@@ -142,13 +158,13 @@ export const createRelayMux = (): TRelayMux => {
   };
 
   const failureCached = (keyId: string): boolean =>
-    peerLinkFailureCache.has(keyId, "mux");
+    failureCache.has(keyId, "mux");
 
   const muxFailureCachedUntil = (keyId: string): number | null =>
-    peerLinkFailureCache.until(keyId, "mux");
+    failureCache.until(keyId, "mux");
 
   const clearMuxFailureForKey = (keyId: string): void => {
-    peerLinkFailureCache.clear(keyId, "mux");
+    failureCache.clear(keyId, "mux");
     stickyLastError.delete(keyId);
     notifyMux();
   };
@@ -509,7 +525,7 @@ export const createRelayMux = (): TRelayMux => {
     channelsByKey.clear();
     channelsById.clear();
     pendingDerives.clear();
-    peerLinkFailureCache.clearPath("mux");
+    failureCache.clearPath("mux");
     stickyLastError.clear();
     notifyMux();
   };

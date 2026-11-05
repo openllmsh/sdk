@@ -98,75 +98,109 @@ const failureTtlMs = (reason: TPeerLinkFailureReason): number => {
 };
 
 const MAX_FAILURE_CACHE_ENTRIES = 1_024;
-const failureCache = new Map<string, number>();
-
-const sweepFailureCache = (now: number): void => {
-  for (const [key, until] of failureCache) {
-    if (until <= now) failureCache.delete(key);
-  }
-  while (failureCache.size > MAX_FAILURE_CACHE_ENTRIES) {
-    const oldest = failureCache.keys().next().value;
-    if (oldest === undefined) return;
-    failureCache.delete(oldest);
-  }
-};
 
 const cacheKeyOf = (target: string, path: TPeerLinkPath): string =>
   `${target}\u0000${path}`;
 
-/** Shared negative-cache operations for host dialers outside a ladder instance. */
-export const peerLinkFailureCache = {
-  clear(target?: string, path?: TPeerLinkPath): void {
-    if (target === undefined) {
-      failureCache.clear();
-      return;
-    }
-    if (path !== undefined) {
-      failureCache.delete(cacheKeyOf(target, path));
-      return;
-    }
-    for (const key of failureCache.keys()) {
-      if (key.startsWith(`${target}\u0000`)) failureCache.delete(key);
-    }
-  },
+export type TPeerLinkFailureCache = {
+  readonly clear: (target?: string, path?: TPeerLinkPath) => void;
   /** Clear one transport's failures without erasing the independent rung. */
-  clearPath(path: TPeerLinkPath): void {
-    for (const key of failureCache.keys()) {
-      if (key.endsWith(`\u0000${path}`)) failureCache.delete(key);
-    }
-  },
-  has(target: string, path: TPeerLinkPath, now = Date.now()): boolean {
-    const key = cacheKeyOf(target, path);
-    const until = failureCache.get(key);
-    if (until === undefined) return false;
-    if (until > now) return true;
-    failureCache.delete(key);
-    return false;
-  },
-  until(target: string, path: TPeerLinkPath, now = Date.now()): number | null {
-    const key = cacheKeyOf(target, path);
-    const until = failureCache.get(key);
-    if (until === undefined) return null;
-    if (until > now) return until;
-    failureCache.delete(key);
-    return null;
-  },
-  set(
+  readonly clearPath: (path: TPeerLinkPath) => void;
+  readonly has: (target: string, path: TPeerLinkPath, now?: number) => boolean;
+  readonly until: (
+    target: string,
+    path: TPeerLinkPath,
+    now?: number,
+  ) => number | null;
+  readonly set: (
     target: string,
     path: TPeerLinkPath,
     reason: TPeerLinkFailureReason,
-    now = Date.now(),
-  ): void {
-    const ttl = failureTtlMs(reason);
-    sweepFailureCache(now);
-    if (ttl > 0) {
-      const key = cacheKeyOf(target, path);
-      failureCache.delete(key);
-      failureCache.set(key, now + ttl);
-      sweepFailureCache(now);
-    }
-  },
+    now?: number,
+  ) => void;
 };
+
+/**
+ * Fresh negative-cache map. Relay-mux instances each own one so two clients
+ * cannot poison or clear each other; RTC host glue and `createPeerLink` keep
+ * the process-global {@link peerLinkFailureCache}.
+ */
+export const createPeerLinkFailureCache = (): TPeerLinkFailureCache => {
+  const failureCache = new Map<string, number>();
+
+  const sweepFailureCache = (now: number): void => {
+    for (const [key, until] of failureCache) {
+      if (until <= now) failureCache.delete(key);
+    }
+    while (failureCache.size > MAX_FAILURE_CACHE_ENTRIES) {
+      const oldest = failureCache.keys().next().value;
+      if (oldest === undefined) return;
+      failureCache.delete(oldest);
+    }
+  };
+
+  return {
+    clear(target?: string, path?: TPeerLinkPath): void {
+      if (target === undefined) {
+        failureCache.clear();
+        return;
+      }
+      if (path !== undefined) {
+        failureCache.delete(cacheKeyOf(target, path));
+        return;
+      }
+      for (const key of failureCache.keys()) {
+        if (key.startsWith(`${target}\u0000`)) failureCache.delete(key);
+      }
+    },
+    clearPath(path: TPeerLinkPath): void {
+      for (const key of failureCache.keys()) {
+        if (key.endsWith(`\u0000${path}`)) failureCache.delete(key);
+      }
+    },
+    has(target: string, path: TPeerLinkPath, now = Date.now()): boolean {
+      const key = cacheKeyOf(target, path);
+      const until = failureCache.get(key);
+      if (until === undefined) return false;
+      if (until > now) return true;
+      failureCache.delete(key);
+      return false;
+    },
+    until(
+      target: string,
+      path: TPeerLinkPath,
+      now = Date.now(),
+    ): number | null {
+      const key = cacheKeyOf(target, path);
+      const until = failureCache.get(key);
+      if (until === undefined) return null;
+      if (until > now) return until;
+      failureCache.delete(key);
+      return null;
+    },
+    set(
+      target: string,
+      path: TPeerLinkPath,
+      reason: TPeerLinkFailureReason,
+      now = Date.now(),
+    ): void {
+      const ttl = failureTtlMs(reason);
+      sweepFailureCache(now);
+      if (ttl > 0) {
+        const key = cacheKeyOf(target, path);
+        failureCache.delete(key);
+        failureCache.set(key, now + ttl);
+        sweepFailureCache(now);
+      }
+    },
+  };
+};
+
+/**
+ * Process-global cache for RTC host dialers and `createPeerLink`. Mux channel
+ * maps own a separate instance via {@link createPeerLinkFailureCache}.
+ */
+export const peerLinkFailureCache = createPeerLinkFailureCache();
 
 export const peerLinkFailureReasonOf = (
   error: unknown,

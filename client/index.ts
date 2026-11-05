@@ -23,6 +23,7 @@ export type {
   TClientDevice,
   TClientDevices,
   TClientDevicesHost,
+  TCreateRelayMuxOptions,
   TMuxChannelState,
   TMuxPhase,
   TRelayMux,
