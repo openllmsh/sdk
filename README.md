@@ -1,94 +1,143 @@
-# `@openllmsh/sdk`
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="./assets/openllm-light.svg">
+    <img alt="OpenLLM" src="./assets/openllm.svg" width="300">
+  </picture>
+</p>
 
-Public OpenLLM SDK: typed protocol contracts, wire-format transforms, the
-sans-I/O tunnel mux, zero-knowledge vault crypto, the public OpenAPI surface,
-and MCP tool defs. Install from GitHub:
+<p align="center"><b>@openllmsh/sdk</b> — everything a client needs to talk to OpenLLM.</p>
 
-```bash
+<p align="center">
+  <a href="./LICENSE"><img alt="License: Apache-2.0 AND BUSL-1.1" src="https://img.shields.io/badge/license-Apache--2.0%20%2B%20BUSL--1.1-blue.svg"></a>
+  <img alt="runtime" src="https://img.shields.io/badge/Bun%20%C2%B7%20Node%20%C2%B7%20browser-TypeScript-black.svg">
+  <img alt="deps: effect" src="https://img.shields.io/badge/deps-effect-blue.svg">
+</p>
+
+---
+
+The same code the OpenLLM browser app, the `openllm` CLI and its local daemon
+run, published as one package. Typed contracts, wire-format transforms, the
+device tunnel, client-side vault crypto, the HTTP API spec and the MCP tools,
+under a single version.
+
+- **One package, imported by subpath.** No root barrel. Pull in
+  `@openllmsh/sdk/protocol`, `/vault` or `/client` and nothing else comes along.
+- **Zero-knowledge by construction.** Provider keys are sealed in the client
+  under a key the server never sees in plaintext; `vault` holds the crypto
+  (Argon2id, AES-256-GCM, HKDF, X25519 seals) and zeroes key material on close.
+- **I/O injected, runs anywhere.** `client` and `mcp` take `fetch`, `WebSocket`
+  and an RTC factory from the host, so the same code runs in the browser, in
+  Bun and in Node.
+- **One contract for HTTP and MCP.** `openapi` ships the public spec with a
+  typed `callOperation()`; `mcp` derives its tools from the same operations.
+
+See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the layers and which may import
+which.
+
+## Install
+
+```sh
 bun install github:openllmsh/sdk#vX.Y.Z
 ```
 
-There is **no root barrel** — import by subpath so each consumer only pulls
-what it needs:
+Releases are tagged with the OpenLLM release version; pin a tag.
+
+## Quickstart
 
 ```ts
-import { ChatCompletionRequest } from "@openllmsh/sdk/protocol";
-import { anthropicToOpenAI } from "@openllmsh/sdk/wire/adapters/messages";
-import { isValidMuxFrame } from "@openllmsh/sdk/tunnel/codec";
-import { sealCliAuth, parseApiKey } from "@openllmsh/sdk/vault";
 import { createClient } from "@openllmsh/sdk/client";
-```
 
-### Client quickstart (vault session)
-
-```ts
 const ollm = createClient({
   origin: "https://openllm.sh",
   apiKey, // sk-llm-…
   transport: { fetch, websocket: WebSocket },
 });
 
-// Unwrap the DEK when you already have the server's dek_for_key blob:
-await ollm.vault.unlockFromApiKey(dekForKeyB64);
-const sealed = await ollm.vault.sealToDevice(devicePubSpkiB64, secret);
-const enc = await ollm.vault.encryptCredential(JSON.stringify(creds));
-ollm.close(); // zeros the DEK
-```
-
-Browser hosts can pass an already-unlocked DEK via `{ dek }` (PIN/passkey
-glue stays in the app).
-
-```ts
-// Typed OpenAPI call (one HTTP surface via callOperation):
-await ollm.http.call("marketplace.launch", {});
-
-// Streaming chat — returns a fetch Response whose body is the SSE stream:
-const stream = await ollm.chat.completions.create(
+// Streaming chat: a fetch Response whose body is the SSE stream.
+const res = await ollm.chat.completions.create(
   { model: "plus", messages, stream: true },
   { signal },
 );
+
+// Any public API operation, typed from the spec.
+await ollm.http.call("marketplace.launch", {});
+
+ollm.close(); // zeroes key material, closes device channels
 ```
 
+### Vault
+
 ```ts
-// Device tunnel (host injects relay send + ladder resolution):
+// Unwrap the data key with the server's dek_for_key blob for this API key.
+await ollm.vault.unlockFromApiKey(dekForKeyB64);
+
+const sealed = await ollm.vault.sealToDevice(devicePubSpkiB64, secret);
+const encrypted = await ollm.vault.encryptCredential(JSON.stringify(creds));
+
+// Borrow the API-key secret; it is zeroed when the callback returns or throws.
+await ollm.vault.withApiKeySecret((secret, id) => use(secret, id));
+```
+
+A browser host that has already unlocked the vault (PIN or passkey) passes
+`{ dek }` to `createClient` instead.
+
+### Devices
+
+```ts
 const ollm = createClient({
   origin,
   apiKey,
-  transport: { fetch, websocket: WebSocket, rtc: (c) => new RTCPeerConnection(c) },
+  transport: {
+    fetch,
+    websocket: WebSocket,
+    rtc: (config) => new RTCPeerConnection(config),
+  },
   devices: { mux: muxDeps, ladder: ladderDeps },
 });
-const dev = ollm.devices.open(deviceId);
-await dev.openOverLadder(async (channel, budget, path) => { /* agentStream… */ });
+
+const device = ollm.devices.open(deviceId);
+await device.openOverLadder(async (channel, budget, path) => {
+  // agentStream(…) over WebRTC, falling back to the relay mux
+});
 ```
 
-RTC channel negotiation stays host-wired in the app store for now; the SDK
-owns the relay-mux open path and the RTC→mux failover ladder.
+The SDK owns the relay-mux open path and the WebRTC → mux failover; the host
+still negotiates the WebRTC channel itself.
+
+### Lower layers
+
+```ts
+import { ChatCompletionRequest } from "@openllmsh/sdk/protocol";
+import { fromAnthropicMessagesRequest } from "@openllmsh/sdk/wire/adapters/messages";
+import { isValidMuxFrame } from "@openllmsh/sdk/tunnel/codec";
+import { parseApiKey, sealCliAuth } from "@openllmsh/sdk/vault";
+```
 
 ## Subpaths
 
 | Subpath | Contents |
 | --- | --- |
-| `@openllmsh/sdk/protocol` | Effect-Schema contracts for clients: request/response, streaming, provider, daemon, and relay wire shapes. |
-| `@openllmsh/sdk/wire` | Pure wire-format transforms (Anthropic↔OpenAI adapters, SSE, token estimate). Shared by the cloud proxy and the local daemon. |
-| `@openllmsh/sdk/tunnel` | Sans-I/O binary mux, device grants, RTC helpers, Noise_IK. Relay imports only `/codec` and `/channel-envelope`. |
-| `@openllmsh/sdk/vault` | Zero-knowledge crypto (Argon2id + AES-256-GCM + HKDF), DEK-carrying API keys, X25519 seals. **Only the barrel is stable public API** — `vault/*` subpaths are internal and may change without a major bump. |
-| `@openllmsh/sdk/openapi` | Committed OpenAPI spec + operations table + `callOperation()`. |
-| `@openllmsh/sdk/openapi/spec.json` | The sanitized OpenAPI document (same sanitize as `/api/swagger`). |
-| `@openllmsh/sdk/mcp` | MCP tool defs (native API, memory, HTTP marketplace upstreams) and `createMcpServer` over an injected transport. |
-| `@openllmsh/sdk/client` | I/O-injected facade over the layers above: vault session, typed HTTP + streaming chat, device tunnel (relay mux with RTC failover). Composition only — no new protocol or crypto. |
+| `@openllmsh/sdk/protocol` | Effect Schema contracts: request/response, streaming, provider, daemon and relay wire shapes. |
+| `@openllmsh/sdk/wire` | Pure wire-format transforms: Anthropic ↔ OpenAI adapters, SSE, token estimates. Shared by the cloud proxy and the daemon. |
+| `@openllmsh/sdk/tunnel` | Sans-I/O binary mux, device grants, WebRTC helpers, Noise_IK. The relay imports only `/codec` and `/channel-envelope`. |
+| `@openllmsh/sdk/vault` | Client-side crypto, DEK-carrying API keys and X25519 seals. **Only the barrel is stable public API**; `vault/*` files are internal. |
+| `@openllmsh/sdk/openapi` | The committed OpenAPI spec, the operations table and `callOperation()`. |
+| `@openllmsh/sdk/openapi/spec.json` | The OpenAPI document itself, as served at `/api/swagger`. |
+| `@openllmsh/sdk/mcp` | MCP tool definitions (API, memory, marketplace upstreams) and `createMcpServer` over an injected transport. |
+| `@openllmsh/sdk/client` | The facade above: vault session, HTTP and chat, device tunnel. Composition only — no protocol or crypto of its own. |
 
-## Licence
+## License
 
-| Path | Licence |
+The package root is **Apache-2.0** ([`LICENSE`](./LICENSE)), covering
+`protocol/`, `openapi/`, `mcp/` and `client/`.
+
+`wire/`, `tunnel/` and `vault/` carry their own `LICENSE` under the
+**Business Source License 1.1**, which governs those folders instead of the
+root. Importing them brings in the BUSL competing-service clause.
+
+| Path | License |
 | --- | --- |
-| `protocol/`, `openapi/`, `mcp/`, `client/` (and the package root) | Apache-2.0 |
-| `wire/` | BUSL-1.1 |
-| `tunnel/` | BUSL-1.1 |
-| `vault/` | BUSL-1.1 |
+| `protocol/`, `openapi/`, `mcp/`, `client/` | Apache-2.0 |
+| `wire/`, `tunnel/`, `vault/` | BUSL-1.1 |
 
-`package.json` declares `"license": "(Apache-2.0 AND BUSL-1.1)"`. The BUSL
-folders carry their own `LICENSE` which overrides the root for those paths;
-adopters who import `wire`, `tunnel` or `vault` take on the BUSL
-competing-service clause.
-
-See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the layering rules.
+`package.json` declares `"license": "(Apache-2.0 AND BUSL-1.1)"`.
