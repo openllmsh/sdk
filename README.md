@@ -49,7 +49,20 @@ const stream = await ollm.chat.completions.create(
 );
 ```
 
-Device tunnels land next on the same `createClient` object.
+```ts
+// Device tunnel (host injects relay send + ladder resolution):
+const ollm = createClient({
+  origin,
+  apiKey,
+  transport: { fetch, websocket: WebSocket, rtc: (c) => new RTCPeerConnection(c) },
+  devices: { mux: muxDeps, ladder: ladderDeps },
+});
+const dev = ollm.devices.open(deviceId);
+await dev.openOverLadder(async (channel, budget, path) => { /* agentStream… */ });
+```
+
+RTC channel negotiation stays host-wired in the app store for now; the SDK
+owns the relay-mux open path and the RTC→mux failover ladder.
 
 ## Subpaths
 

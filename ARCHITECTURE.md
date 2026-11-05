@@ -21,7 +21,7 @@ any SDK layer       ←  client   (no node:*)
 | `vault/` | `@openllmsh/sdk/protocol`, `@openllmsh/sdk/tunnel`, `@noble/ed25519`, `@scure/bip39`, `hash-wasm` | Zero-knowledge crypto. See `vault/ARCHITECTURE.md`. |
 | `openapi/` | `@openllmsh/sdk/protocol` (+ committed JSON) | Spec + operations table + `callOperation`. |
 | `mcp/` | `@openllmsh/sdk/openapi`, `@openllmsh/sdk/protocol`, `@openllmsh/sdk/client`, `@modelcontextprotocol/server` | Tool defs + `createMcpServer`; no `node:*`. |
-| `client/` | any SDK layer; no `node:*` | I/O-injected facade (`createClient`): vault session, then HTTP, then device tunnel. |
+| `client/` | any SDK layer; no `node:*` | I/O-injected facade (`createClient`): vault session, HTTP (`callOperation`), device tunnel (relay-mux + open ladder). |
 
 Rules that apply to every folder:
 
