@@ -1,12 +1,12 @@
 /**
  * memory tool group — defs + dispatcher, composed into the ONE
  * MCP server by `../server.ts`. Project identity is injected via
- * `PluginConfig` — this module never reads `process.cwd()` or git.
+ * `MemoryConfig` — this module never reads `process.cwd()` or git.
  */
 
 import type { TToolResult } from "../types";
 import { MemoryClient } from "./memory-client";
-import type { PluginConfig, TProjectRef } from "./memory-config";
+import type { MemoryConfig, TProjectRef } from "./memory-config";
 
 const MAX_CONTENT_LENGTH = 200_000;
 const MAX_QUERY_LENGTH = 1_000;
@@ -112,7 +112,7 @@ export const memoryToolDefs = [
 
 const clientFor = (() => {
   let cached: { key: string; client: MemoryClient } | null = null;
-  return (config: PluginConfig): MemoryClient => {
+  return (config: MemoryConfig): MemoryClient => {
     const key = `${config.gatewayUrl}\0${config.gatewayApiKey}`;
     if (cached === null || cached.key !== key) {
       cached = { key, client: new MemoryClient(config) };
@@ -138,7 +138,7 @@ const slugify = (input: string): string =>
     .slice(0, 64);
 
 const defaultResolveProject = (
-  config: PluginConfig,
+  config: MemoryConfig,
   override?: string,
 ): string => {
   if (config.resolveProject) return config.resolveProject(override);
@@ -151,7 +151,7 @@ const defaultResolveProject = (
 };
 
 const defaultBuildProjectRef = (
-  config: PluginConfig,
+  config: MemoryConfig,
   projectSlug: string,
 ): TProjectRef => {
   if (config.buildProjectRef) return config.buildProjectRef(projectSlug);
@@ -160,7 +160,7 @@ const defaultBuildProjectRef = (
 
 const handleMemory = async (
   client: MemoryClient,
-  config: PluginConfig,
+  config: MemoryConfig,
   args: {
     content: string;
     action?: "save" | "forget";
@@ -260,7 +260,7 @@ const handleMemory = async (
 
 const handleRecall = async (
   client: MemoryClient,
-  config: PluginConfig,
+  config: MemoryConfig,
   args: { query: string; limit?: number; project?: string },
 ): Promise<TToolResult> => {
   if (!args?.query) {
@@ -337,7 +337,7 @@ const handleWhoAmI = async (client: MemoryClient): Promise<TToolResult> => {
 export const handleMemoryTool = async (
   name: string,
   args: Record<string, unknown>,
-  config: PluginConfig,
+  config: MemoryConfig,
 ): Promise<TToolResult> => {
   const client = clientFor(config);
   try {

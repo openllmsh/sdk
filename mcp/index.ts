@@ -58,6 +58,6 @@ export type {
   WhoamiResult,
 } from "./tools/memory-client";
 export { MemoryClient } from "./tools/memory-client";
-export type { PluginConfig, TProjectRef } from "./tools/memory-config";
+export type { MemoryConfig, TProjectRef } from "./tools/memory-config";
 export { COLLECTION_NAME } from "./tools/memory-config";
 export type { TToolResult, TToolResultContent } from "./types";

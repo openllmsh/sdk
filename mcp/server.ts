@@ -20,7 +20,7 @@ import {
   upstreamToolName,
 } from "./tools/marketplace";
 import { handleMemoryTool, memoryToolDefs } from "./tools/memory";
-import type { PluginConfig } from "./tools/memory-config";
+import type { MemoryConfig } from "./tools/memory-config";
 import {
   MODELS_TOOL_NAME,
   prioritizeSubscriptionModels,
@@ -67,9 +67,9 @@ export type TCreateMcpServerOptions = {
     args: Record<string, unknown>,
     config: TMcpGatewayConfig,
   ) => Promise<TToolResult>;
-  /** Extra fields merged into the memory PluginConfig (cwd / project injectors). */
+  /** Extra fields merged into the memory MemoryConfig (cwd / project injectors). */
   readonly memory?: Partial<
-    Pick<PluginConfig, "cwd" | "resolveProject" | "buildProjectRef">
+    Pick<MemoryConfig, "cwd" | "resolveProject" | "buildProjectRef">
   >;
 };
 
@@ -87,7 +87,7 @@ export const createMcpServer = ({
   const memoryEnabled =
     groups.includes("openllm-memory") &&
     builtins.includes(OPENLLM_MEMORY_BUILTIN_ID);
-  const memoryConfig: PluginConfig = {
+  const memoryConfig: MemoryConfig = {
     name: "openllm",
     version,
     gatewayUrl: config.baseUrl,

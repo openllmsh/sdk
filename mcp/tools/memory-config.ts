@@ -1,9 +1,9 @@
 /**
- * memory plugin config.
+ * memory integration config.
  *
  * Embedding happens entirely on the gateway (host-paid Bedrock Titan v2
  * at 1024-d, fixed). The bundle ships raw text to
- * `/api/plugins/memory/{save,forget,search}` and never touches an
+ * `/api/integrations/memory/{save,forget,search}` and never touches an
  * embedding endpoint — keeps the host model off the public surface.
  *
  * Project identity is injected by the host (CLI/browser). This module never
@@ -18,7 +18,7 @@ export type TProjectRef = {
   readonly remote_repo?: string;
 };
 
-export interface PluginConfig {
+export interface MemoryConfig {
   name: string;
   version: string;
   gatewayUrl: string;

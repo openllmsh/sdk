@@ -1,14 +1,12 @@
 /**
- * Thin client over the gateway's OpenLLM Memory endpoints.
- *
- * Prefers `/api/integrations/memory/*` and falls back to the legacy
- * `/api/plugins/memory/*` alias so older gateways and installed CLIs
- * keep working. Embedding and scoping live server-side — this client
- * just forwards save/forget/search/match with the caller's API key.
+ * Thin client over the gateway's OpenLLM Memory endpoints
+ * (`/api/integrations/memory/*`). Embedding and scoping live
+ * server-side — this client just forwards save/forget/search/match
+ * with the caller's API key.
  */
 
 import type { THttpClientOptions } from "@openllmsh/sdk/openapi";
-import type { PluginConfig, TProjectRef } from "./memory-config";
+import type { MemoryConfig, TProjectRef } from "./memory-config";
 
 // ── Domain types ──────────────────────────────────────────────────────────
 
@@ -66,30 +64,14 @@ export interface SearchOptions {
 
 // ── Client ────────────────────────────────────────────────────────────────
 
-const MEMORY_ROOT_PRIMARY = "/api/integrations/memory";
-const MEMORY_ROOT_LEGACY = "/api/plugins/memory";
-
-/**
- * Hook transports (CLI memory-hooks) throw on non-OK with a `diagnostic.status`
- * field. A 404 is a missing route, not a hard fault — detect duck-typed so this
- * module never imports the CLI transport class.
- */
-const isRouteMissing = (error: unknown): boolean => {
-  if (error === null || typeof error !== "object") return false;
-  if (!("diagnostic" in error)) return false;
-  const diagnostic = (error as { readonly diagnostic?: unknown }).diagnostic;
-  if (diagnostic === null || typeof diagnostic !== "object") return false;
-  return (diagnostic as { readonly status?: unknown }).status === 404;
-};
+const MEMORY_ROOT = "/api/integrations/memory";
 
 export class MemoryClient {
   private baseUrl: string;
   private apiKey: string;
-  /** Cached after the first successful response — prefers the new root. */
-  private root: string | null = null;
 
   constructor(
-    config: PluginConfig,
+    config: MemoryConfig,
     private readonly options: THttpClientOptions = {},
   ) {
     this.baseUrl = config.gatewayUrl.replace(/\/$/, "");
@@ -118,37 +100,14 @@ export class MemoryClient {
     action: string,
     body?: unknown,
   ): Promise<T> {
-    const roots =
-      this.root !== null
-        ? [this.root]
-        : [MEMORY_ROOT_PRIMARY, MEMORY_ROOT_LEGACY];
-    let lastStatus = 0;
-    let lastText = "";
-    let lastPath = "";
-    for (const root of roots) {
-      const path = `${root}/${action}`;
-      lastPath = path;
-      try {
-        const res = await this.requestOnce(method, path, body);
-        if (res.ok) {
-          this.root = root;
-          if (res.status === 204) return undefined as unknown as T;
-          return (await res.json()) as T;
-        }
-        lastStatus = res.status;
-        lastText = await res.text().catch(() => "");
-        // Only fall through to the legacy alias on a missing new route.
-        if (res.status !== 404 || root === MEMORY_ROOT_LEGACY) break;
-      } catch (error) {
-        if (isRouteMissing(error) && root !== MEMORY_ROOT_LEGACY) {
-          lastStatus = 404;
-          lastText = "";
-          continue;
-        }
-        throw error;
-      }
+    const path = `${MEMORY_ROOT}/${action}`;
+    const res = await this.requestOnce(method, path, body);
+    if (res.ok) {
+      if (res.status === 204) return undefined as unknown as T;
+      return (await res.json()) as T;
     }
-    throw new Error(`${method} ${lastPath} → ${lastStatus}: ${lastText}`);
+    const text = await res.text().catch(() => "");
+    throw new Error(`${method} ${path} → ${res.status}: ${text}`);
   }
 
   /**
@@ -156,40 +115,21 @@ export class MemoryClient {
    * recall/extract network work.
    *
    * - `200` with `enabled` → that value
-   * - `404` on both roots → treat as enabled (older gateway without the probe)
+   * - `404` → treat as enabled (older gateway without the probe)
    * - other failures throw (caller fail-opens to skip)
    */
   async isEnabled(): Promise<boolean> {
-    const roots =
-      this.root !== null
-        ? [this.root]
-        : [MEMORY_ROOT_PRIMARY, MEMORY_ROOT_LEGACY];
-    let sawOnly404 = true;
-    for (const root of roots) {
-      const path = `${root}/enabled`;
-      try {
-        const res = await this.requestOnce("GET", path, undefined);
-        if (res.ok) {
-          this.root = root;
-          const body = (await res.json()) as { enabled?: unknown };
-          // Only an explicit `false` disables. Missing/unknown fields (and
-          // older mocks that return an empty JSON body) stay enabled.
-          return body.enabled !== false;
-        }
-        if (res.status !== 404) {
-          sawOnly404 = false;
-          const text = await res.text().catch(() => "");
-          throw new Error(`GET ${path} → ${res.status}: ${text}`);
-        }
-      } catch (error) {
-        // Hook transport throws on 404 — same as a missing route from an
-        // older gateway without the probe.
-        if (isRouteMissing(error)) continue;
-        throw error;
-      }
+    const path = `${MEMORY_ROOT}/enabled`;
+    const res = await this.requestOnce("GET", path, undefined);
+    if (res.ok) {
+      const body = (await res.json()) as { enabled?: unknown };
+      // Only an explicit `false` disables. Missing/unknown fields (and
+      // older mocks that return an empty JSON body) stay enabled.
+      return body.enabled !== false;
     }
-    if (sawOnly404) return true;
-    return false;
+    if (res.status === 404) return true;
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET ${path} → ${res.status}: ${text}`);
   }
 
   /**

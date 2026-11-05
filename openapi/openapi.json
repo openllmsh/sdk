@@ -64463,7 +64463,7 @@
                     "search_provider": {
                       "type": "string"
                     },
-                    "plugin_allow_list": {
+                    "integration_allow_list": {
                       "type": "array",
                       "items": {
                         "type": "string"
@@ -64530,7 +64530,7 @@
                     "default_aliases",
                     "model_catalog",
                     "search_provider",
-                    "plugin_allow_list"
+                    "integration_allow_list"
                   ],
                   "additionalProperties": false
                 }
@@ -69845,12 +69845,12 @@
         }
       }
     },
-    "/plugins/memory/save": {
+    "/integrations/memory/save": {
       "post": {
         "tags": [
-          "pluginsMemory"
+          "memory"
         ],
-        "operationId": "pluginsMemory.save",
+        "operationId": "memory.save",
         "parameters": [],
         "security": [],
         "responses": {
@@ -70269,12 +70269,12 @@
         }
       }
     },
-    "/plugins/memory/forget": {
+    "/integrations/memory/forget": {
       "post": {
         "tags": [
-          "pluginsMemory"
+          "memory"
         ],
-        "operationId": "pluginsMemory.forget",
+        "operationId": "memory.forget",
         "parameters": [],
         "security": [],
         "responses": {
@@ -70608,12 +70608,12 @@
         }
       }
     },
-    "/plugins/memory/search": {
+    "/integrations/memory/search": {
       "post": {
         "tags": [
-          "pluginsMemory"
+          "memory"
         ],
-        "operationId": "pluginsMemory.search",
+        "operationId": "memory.search",
         "parameters": [],
         "security": [],
         "responses": {
@@ -71104,12 +71104,12 @@
         }
       }
     },
-    "/plugins/memory/usage": {
+    "/integrations/memory/usage": {
       "get": {
         "tags": [
-          "pluginsMemory"
+          "memory"
         ],
-        "operationId": "pluginsMemory.usage",
+        "operationId": "memory.usage",
         "parameters": [
           {
             "name": "limit",
@@ -71627,12 +71627,12 @@
         }
       }
     },
-    "/plugins/memory/projects": {
+    "/integrations/memory/projects": {
       "get": {
         "tags": [
-          "pluginsMemory"
+          "memory"
         ],
-        "operationId": "pluginsMemory.projects",
+        "operationId": "memory.projects",
         "parameters": [],
         "security": [],
         "responses": {
@@ -71901,12 +71901,12 @@
         }
       }
     },
-    "/plugins/memory/whoami": {
+    "/integrations/memory/whoami": {
       "get": {
         "tags": [
-          "pluginsMemory"
+          "memory"
         ],
-        "operationId": "pluginsMemory.whoami",
+        "operationId": "memory.whoami",
         "parameters": [],
         "security": [],
         "responses": {
@@ -72196,12 +72196,12 @@
         }
       }
     },
-    "/plugins/memory/match": {
+    "/integrations/memory/match": {
       "post": {
         "tags": [
-          "pluginsMemory"
+          "memory"
         ],
-        "operationId": "pluginsMemory.match",
+        "operationId": "memory.match",
         "parameters": [],
         "security": [],
         "responses": {
@@ -72645,7 +72645,7 @@
       "name": "daemonAttestations"
     },
     {
-      "name": "pluginsMemory"
+      "name": "memory"
     }
   ],
   "servers": [

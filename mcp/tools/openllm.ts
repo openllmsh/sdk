@@ -261,8 +261,8 @@ const SESSION_ONLY_PATHS: ReadonlySet<string> = new Set([
  *  trims context bloat; it does NOT gate execution — `byToolName` above
  *  keeps every operation callable, and the browser chat imports the full
  *  `openllmToolDefsAll` below. Denylist:
- *   1. `/plugins/*` — the curated `memory` MCP
- *      groups already expose these better; the raw HTTP mirrors are dupes.
+ *   1. `/integrations/memory/*` — the OpenLLM Memory marketplace entry's
+ *      MCP group already exposes these; the raw HTTP mirrors are dupes.
  *   2. Non-`/v1/*` mutations (post/put/patch/delete) — account/config/
  *      vault/keys/sessions/credentials writes an agent shouldn't drive
  *      through MCP. Inference (`/v1/*`) and all read-only GETs stay.
@@ -271,7 +271,7 @@ const SESSION_ONLY_PATHS: ReadonlySet<string> = new Set([
  *      session cookie, so listing them spends an agent's context on a call
  *      that can only ever come back 401. */
 const isMcpExposed = (op: TApiOperation): boolean => {
-  if (op.path.startsWith("/plugins/")) return false;
+  if (op.path.startsWith("/integrations/memory")) return false;
   // POST, but a read: a search, not an account write (tier-gated by caller).
   if (GRAVITY_INDEX_TOOLS.has(toolNameFor(op))) return true;
   if (MUTATING.has(op.method) && !op.path.startsWith("/v1/")) return false;

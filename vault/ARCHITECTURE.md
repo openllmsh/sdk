@@ -148,7 +148,7 @@ of `public.users`:
   is a 409 `reset_conflict` that promotes nothing. Otherwise: promote `*_next`, drop old-generation credentials,
   bump `vault_version`, **hard-delete all API keys** (their
   `dek_for_key` wraps the now-stale DEK), and **hard-delete all saved
-  memories** (`public.embeddings` rows with `plugin = 'memory'` —
+  memories** (`public.embeddings` rows with `integration = 'memory'` —
   encrypted under the old DEK and never staged/re-encrypted across a
   rotation; see "DEK-encrypted memories" below). It also best-effort
   deletes input-media blobs and their ledger rows because their encrypted
@@ -327,7 +327,7 @@ The third DEK wrapper, beside the phrase and the PIN
 
 ## DEK-encrypted memories
 
-Saved memories (the memory plugin's rows in `public.embeddings`)
+Saved memories (OpenLLM Memory rows in `public.embeddings`)
 are AES-256-GCM encrypted **at rest** under the same DEK, reusing
 `encryptCredential` / `decryptCredential`: `content` holds base64
 ciphertext, `content_nonce` the base64 nonce, `vault_version` the DEK

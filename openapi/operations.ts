@@ -445,6 +445,111 @@ export const API_OPERATIONS: readonly TApiOperation[] = [
     "hasBody": false
   },
   {
+    "id": "memory.forget",
+    "method": "post",
+    "path": "/integrations/memory/forget",
+    "summary": "",
+    "tags": [
+      "memory"
+    ],
+    "pathParams": [],
+    "queryParams": [],
+    "hasBody": true
+  },
+  {
+    "id": "memory.match",
+    "method": "post",
+    "path": "/integrations/memory/match",
+    "summary": "",
+    "tags": [
+      "memory"
+    ],
+    "pathParams": [],
+    "queryParams": [],
+    "hasBody": true
+  },
+  {
+    "id": "memory.projects",
+    "method": "get",
+    "path": "/integrations/memory/projects",
+    "summary": "",
+    "tags": [
+      "memory"
+    ],
+    "pathParams": [],
+    "queryParams": [],
+    "hasBody": false
+  },
+  {
+    "id": "memory.save",
+    "method": "post",
+    "path": "/integrations/memory/save",
+    "summary": "",
+    "tags": [
+      "memory"
+    ],
+    "pathParams": [],
+    "queryParams": [],
+    "hasBody": true
+  },
+  {
+    "id": "memory.search",
+    "method": "post",
+    "path": "/integrations/memory/search",
+    "summary": "",
+    "tags": [
+      "memory"
+    ],
+    "pathParams": [],
+    "queryParams": [],
+    "hasBody": true
+  },
+  {
+    "id": "memory.usage",
+    "method": "get",
+    "path": "/integrations/memory/usage",
+    "summary": "",
+    "tags": [
+      "memory"
+    ],
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "limit",
+        "required": false
+      },
+      {
+        "name": "offset",
+        "required": false
+      },
+      {
+        "name": "project",
+        "required": false
+      },
+      {
+        "name": "team",
+        "required": false
+      },
+      {
+        "name": "q",
+        "required": false
+      }
+    ],
+    "hasBody": false
+  },
+  {
+    "id": "memory.whoami",
+    "method": "get",
+    "path": "/integrations/memory/whoami",
+    "summary": "",
+    "tags": [
+      "memory"
+    ],
+    "pathParams": [],
+    "queryParams": [],
+    "hasBody": false
+  },
+  {
     "id": "keys.list",
     "method": "get",
     "path": "/keys",
@@ -648,111 +753,6 @@ export const API_OPERATIONS: readonly TApiOperation[] = [
     "pathParams": [
       "id"
     ],
-    "queryParams": [],
-    "hasBody": false
-  },
-  {
-    "id": "pluginsMemory.forget",
-    "method": "post",
-    "path": "/plugins/memory/forget",
-    "summary": "",
-    "tags": [
-      "pluginsMemory"
-    ],
-    "pathParams": [],
-    "queryParams": [],
-    "hasBody": true
-  },
-  {
-    "id": "pluginsMemory.match",
-    "method": "post",
-    "path": "/plugins/memory/match",
-    "summary": "",
-    "tags": [
-      "pluginsMemory"
-    ],
-    "pathParams": [],
-    "queryParams": [],
-    "hasBody": true
-  },
-  {
-    "id": "pluginsMemory.projects",
-    "method": "get",
-    "path": "/plugins/memory/projects",
-    "summary": "",
-    "tags": [
-      "pluginsMemory"
-    ],
-    "pathParams": [],
-    "queryParams": [],
-    "hasBody": false
-  },
-  {
-    "id": "pluginsMemory.save",
-    "method": "post",
-    "path": "/plugins/memory/save",
-    "summary": "",
-    "tags": [
-      "pluginsMemory"
-    ],
-    "pathParams": [],
-    "queryParams": [],
-    "hasBody": true
-  },
-  {
-    "id": "pluginsMemory.search",
-    "method": "post",
-    "path": "/plugins/memory/search",
-    "summary": "",
-    "tags": [
-      "pluginsMemory"
-    ],
-    "pathParams": [],
-    "queryParams": [],
-    "hasBody": true
-  },
-  {
-    "id": "pluginsMemory.usage",
-    "method": "get",
-    "path": "/plugins/memory/usage",
-    "summary": "",
-    "tags": [
-      "pluginsMemory"
-    ],
-    "pathParams": [],
-    "queryParams": [
-      {
-        "name": "limit",
-        "required": false
-      },
-      {
-        "name": "offset",
-        "required": false
-      },
-      {
-        "name": "project",
-        "required": false
-      },
-      {
-        "name": "team",
-        "required": false
-      },
-      {
-        "name": "q",
-        "required": false
-      }
-    ],
-    "hasBody": false
-  },
-  {
-    "id": "pluginsMemory.whoami",
-    "method": "get",
-    "path": "/plugins/memory/whoami",
-    "summary": "",
-    "tags": [
-      "pluginsMemory"
-    ],
-    "pathParams": [],
     "queryParams": [],
     "hasBody": false
   },
