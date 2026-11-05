@@ -75,7 +75,7 @@ owns the relay-mux open path and the RTC→mux failover ladder.
 | `@openllmsh/sdk/openapi` | Committed OpenAPI spec + operations table + `callOperation()`. |
 | `@openllmsh/sdk/openapi/spec.json` | The sanitized OpenAPI document (same sanitize as `/api/swagger`). |
 | `@openllmsh/sdk/mcp` | MCP tool defs (native API, memory, HTTP marketplace upstreams) and `createMcpServer` over an injected transport. |
-| `@openllmsh/sdk/client` | I/O-injected facade: vault session today; HTTP + device tunnel next. Composition only — no new crypto. |
+| `@openllmsh/sdk/client` | I/O-injected facade over the layers above: vault session, typed HTTP + streaming chat, device tunnel (relay mux with RTC failover). Composition only — no new protocol or crypto. |
 
 ## Licence
 
