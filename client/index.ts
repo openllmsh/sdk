@@ -1,13 +1,24 @@
 /**
  * `@openllmsh/sdk/client` — thin, I/O-injected composition facade over the SDK
- * layers. Phase 3 lands vault session first; HTTP (`callOperation`) and device
- * tunnel (relay mux → RTC) follow in the same phase.
+ * layers. Vault session and HTTP are live; device tunnel follows.
  */
 
+import type { TClientChat } from "./chat";
+import { createClientChat } from "./chat";
+import type { TClientHttp } from "./http";
+import { createClientHttp } from "./http";
 import type { TCreateClientOptions } from "./types";
 import type { TClientVault } from "./vault";
 import { createClientVault } from "./vault";
 
+export type {
+  TChatCompletionCreateBody,
+  TChatCompletions,
+  TClientChat,
+} from "./chat";
+export { createClientChat } from "./chat";
+export type { TClientHttp, TClientHttpOptions } from "./http";
+export { createClientHttp } from "./http";
 export type {
   TClientTransport,
   TCreateClientOptions,
@@ -26,6 +37,8 @@ export type TOpenllmClient = {
   readonly apiKey: string;
   readonly transport: TCreateClientOptions["transport"];
   readonly vault: TClientVault;
+  readonly http: TClientHttp;
+  readonly chat: TClientChat;
   /** Optional `dek_for_key` carried from create options for a later unlock. */
   readonly dekForKey: string | undefined;
   /** Zero vault material. Idempotent. */
@@ -45,12 +58,20 @@ export const createClient = (options: TCreateClientOptions): TOpenllmClient => {
     apiKey: options.apiKey,
     ...(options.dek !== undefined ? { dek: options.dek } : {}),
   });
+  const http = createClientHttp({
+    origin,
+    apiKey: options.apiKey,
+    fetch: options.transport.fetch,
+  });
+  const chat = createClientChat(http);
 
   return {
     origin,
     apiKey: options.apiKey,
     transport: options.transport,
     vault,
+    http,
+    chat,
     dekForKey: options.dekForKey,
     close: (): void => {
       vault.close();

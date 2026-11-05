@@ -36,8 +36,20 @@ ollm.close(); // zeros the DEK
 ```
 
 Browser hosts can pass an already-unlocked DEK via `{ dek }` (PIN/passkey
-glue stays in the app). HTTP `/v1` and device tunnels land next on the same
-`createClient` object.
+glue stays in the app).
+
+```ts
+// Typed OpenAPI call (one HTTP surface via callOperation):
+await ollm.http.call("marketplace.launch", {});
+
+// Streaming chat — returns a fetch Response whose body is the SSE stream:
+const stream = await ollm.chat.completions.create(
+  { model: "plus", messages, stream: true },
+  { signal },
+);
+```
+
+Device tunnels land next on the same `createClient` object.
 
 ## Subpaths
 

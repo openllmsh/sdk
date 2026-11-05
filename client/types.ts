@@ -19,10 +19,11 @@ export type TWebSocketConstructor = {
 export type TRtcFactory = (config?: RTCConfiguration) => RTCPeerConnection;
 
 export type TClientTransport = {
-  readonly fetch: (
-    input: string | URL | Request,
-    init?: RequestInit,
-  ) => Promise<Response>;
+  /**
+   * Host fetch. Signature matches `openapi/call.ts` (`input: string`) so CLI
+   * test doubles and memory-hook transports type-check without wrappers.
+   */
+  readonly fetch: (input: string, init?: RequestInit) => Promise<Response>;
   readonly websocket: TWebSocketConstructor;
   readonly rtc?: TRtcFactory;
 };

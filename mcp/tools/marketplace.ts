@@ -10,6 +10,7 @@
  */
 
 import type { CallToolResult } from "@modelcontextprotocol/server";
+import { createClient } from "@openllmsh/sdk/client";
 
 /** One resolved MCP server from `/api/marketplace/launch`. */
 export type TMarketplaceLaunchServer = {
@@ -114,19 +115,25 @@ export const fetchMarketplaceLaunch = async (
   params: TFetchMarketplaceLaunchParams,
 ): Promise<TMarketplaceLaunch> => {
   if (params.apiKey.length === 0) return EMPTY_LAUNCH;
+  const client = createClient({
+    origin: params.cloudOrigin,
+    apiKey: params.apiKey,
+    transport: {
+      fetch: globalThis.fetch.bind(globalThis),
+      websocket: WebSocket,
+    },
+  });
   try {
-    const res = await fetch(
-      `${params.cloudOrigin.replace(/\/$/, "")}/api/marketplace/launch`,
-      {
-        headers: { authorization: `Bearer ${params.apiKey}` },
-        signal: AbortSignal.timeout(LAUNCH_TIMEOUT_MS),
-      },
+    const res = await client.http.call(
+      "marketplace.launch",
+      {},
+      { timeoutMs: LAUNCH_TIMEOUT_MS },
     );
     if (!res.ok) return EMPTY_LAUNCH;
-    const body = (await res.json()) as {
-      servers?: unknown;
-      builtins?: unknown;
-    };
+    const body =
+      res.body !== null && typeof res.body === "object"
+        ? (res.body as { servers?: unknown; builtins?: unknown })
+        : {};
     const servers = Array.isArray(body.servers)
       ? body.servers.filter(isLaunchServer).filter((s) => !RESERVED.has(s.id))
       : [];
@@ -141,6 +148,8 @@ export const fetchMarketplaceLaunch = async (
     return { servers, builtins };
   } catch {
     return EMPTY_LAUNCH;
+  } finally {
+    client.close();
   }
 };
 

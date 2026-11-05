@@ -11,8 +11,9 @@
  * descriptions.
  */
 
+import { createClient } from "@openllmsh/sdk/client";
 import type { TApiOperation } from "@openllmsh/sdk/openapi";
-import { API_OPERATIONS, callOperation } from "@openllmsh/sdk/openapi";
+import { API_OPERATIONS } from "@openllmsh/sdk/openapi";
 import generatedSpec from "@openllmsh/sdk/openapi/spec.json";
 import {
   OAUTH_PROVIDER_SLUGS,
@@ -652,15 +653,27 @@ const mediaRedirectResult = async (
     op.hasBody && args.body !== undefined
       ? JSON.stringify(args.body)
       : undefined;
-  const res = await fetch(url, {
-    method: op.method.toUpperCase(),
-    headers: {
-      authorization: `Bearer ${config.apiKey}`,
-      ...(body === undefined ? {} : { "content-type": "application/json" }),
+  const client = createClient({
+    origin: config.baseUrl,
+    apiKey: config.apiKey,
+    transport: {
+      fetch: globalThis.fetch.bind(globalThis),
+      websocket: WebSocket,
     },
-    ...(body === undefined ? {} : { body }),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
+  let res: Response;
+  try {
+    res = await client.http.request(url, {
+      method: op.method.toUpperCase(),
+      headers: {
+        ...(body === undefined ? {} : { "content-type": "application/json" }),
+      },
+      ...(body === undefined ? {} : { body }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } finally {
+    client.close();
+  }
   if (!res.ok) return responseErrorResult(res);
 
   await res.body?.cancel();
@@ -706,7 +719,20 @@ export const handleOpenllmTool = async (
       return await mediaRedirectResult(config, op, args, mediaRedirectKind);
     }
 
-    const res = await callOperation(config, op, args);
+    const client = createClient({
+      origin: config.baseUrl,
+      apiKey: config.apiKey,
+      transport: {
+        fetch: globalThis.fetch.bind(globalThis),
+        websocket: WebSocket,
+      },
+    });
+    let res: Awaited<ReturnType<typeof client.http.call>>;
+    try {
+      res = await client.http.call(op, args);
+    } finally {
+      client.close();
+    }
     const text =
       typeof res.body === "string"
         ? res.body
