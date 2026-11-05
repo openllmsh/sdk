@@ -27,7 +27,9 @@ export {
   attachMarketplaceUpstreams,
   beginMarketplaceLoad,
   createMcpServer,
+  filterLaunchServers,
   OPENLLM_MEMORY_BUILTIN_ID,
+  OPENLLM_MEMORY_ENTRY_ID,
 } from "./server";
 export type {
   TConnectUpstreamOptions,

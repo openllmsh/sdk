@@ -19,8 +19,6 @@ import {
   LAUNCH_TIMEOUT_MS,
   upstreamToolName,
 } from "./tools/marketplace";
-import { handleMemoryTool, memoryToolDefs } from "./tools/memory";
-import type { MemoryConfig } from "./tools/memory-config";
 import {
   MODELS_TOOL_NAME,
   prioritizeSubscriptionModels,
@@ -34,11 +32,10 @@ import {
 } from "./tools/openllm";
 import type { TToolResult } from "./types";
 
-/** Catalog id for the first-party memory builtin. */
-export const OPENLLM_MEMORY_BUILTIN_ID = "openllm-memory";
-
-const isMemoryTool = (name: string): boolean =>
-  memoryToolDefs.some((tool) => tool.name === name);
+/** Catalog id for the OpenLLM Memory marketplace entry. */
+export const OPENLLM_MEMORY_ENTRY_ID = "openllm-memory";
+/** @deprecated Use {@link OPENLLM_MEMORY_ENTRY_ID}. */
+export const OPENLLM_MEMORY_BUILTIN_ID = OPENLLM_MEMORY_ENTRY_ID;
 
 export type TMcpGatewayConfig = {
   readonly baseUrl: string;
@@ -52,8 +49,6 @@ export type TCreateMcpServerOptions = {
   readonly groups: readonly string[];
   readonly config: TMcpGatewayConfig;
   readonly upstreams?: readonly TUpstream[];
-  /** Enabled first-party builtins from `/api/marketplace/launch`. */
-  readonly builtins?: readonly string[];
   /**
    * When true, Gravity Index (free-tier-only) tools are registered. Defaults
    * to false — unknown / paid tiers hide them.
@@ -67,10 +62,6 @@ export type TCreateMcpServerOptions = {
     args: Record<string, unknown>,
     config: TMcpGatewayConfig,
   ) => Promise<TToolResult>;
-  /** Extra fields merged into the memory MemoryConfig (cwd / project injectors). */
-  readonly memory?: Partial<
-    Pick<MemoryConfig, "cwd" | "resolveProject" | "buildProjectRef">
-  >;
 };
 
 /** One registration path for both negotiated stdio eras and local tests. */
@@ -79,21 +70,9 @@ export const createMcpServer = ({
   groups,
   config,
   upstreams = [],
-  builtins = [],
   includeFreeTierOnlyTools = false,
   transcribe,
-  memory,
 }: TCreateMcpServerOptions): McpServer => {
-  const memoryEnabled =
-    groups.includes("openllm-memory") &&
-    builtins.includes(OPENLLM_MEMORY_BUILTIN_ID);
-  const memoryConfig: MemoryConfig = {
-    name: "openllm",
-    version,
-    gatewayUrl: config.baseUrl,
-    gatewayApiKey: config.apiKey,
-    ...memory,
-  };
   const openllmTools = openllmToolDefs.filter((tool) => {
     if (!includeFreeTierOnlyTools && isFreeTierOnlyTool(tool.name))
       return false;
@@ -102,10 +81,7 @@ export const createMcpServer = ({
       return false;
     return true;
   });
-  const tools = [
-    ...(groups.includes("openllm") ? openllmTools : []),
-    ...(memoryEnabled ? memoryToolDefs : []),
-  ];
+  const tools = [...(groups.includes("openllm") ? openllmTools : [])];
   const server = new McpServer(
     { name: "openllm", version },
     { capabilities: { tools: {} } },
@@ -135,9 +111,6 @@ export const createMcpServer = ({
       name,
       toolConfig as unknown as Parameters<McpServer["registerTool"]>[1],
       async (args: Record<string, unknown>): Promise<TToolResult> => {
-        if (memoryEnabled && isMemoryTool(name)) {
-          return handleMemoryTool(name, args, memoryConfig);
-        }
         if (
           groups.includes("openllm") &&
           isMcpListedTool(name) &&
@@ -169,7 +142,7 @@ export const createMcpServer = ({
       },
     );
   }
-  if (groups.includes("openllm")) {
+  if (upstreams.length > 0) {
     attachMarketplaceUpstreams(
       server,
       upstreams,
@@ -234,7 +207,6 @@ export const attachMarketplaceUpstreams = (
 
 export type TLaunchConnected = {
   readonly upstreams: readonly TUpstream[];
-  readonly builtins: readonly string[];
 };
 
 export type TMarketplaceLoad = {
@@ -255,9 +227,29 @@ export type TBeginMarketplaceLoadOptions = {
 };
 
 /**
+ * Filter launch servers for the requested MCP groups.
+ * - both / default: every server
+ * - `--only openllm-memory`: just the Memory marketplace entry
+ * - `--only openllm`: every server except Memory
+ */
+export const filterLaunchServers = (
+  servers: readonly TMarketplaceLaunchServer[],
+  groups: readonly string[],
+): readonly TMarketplaceLaunchServer[] => {
+  const wantsOpenllm = groups.includes("openllm");
+  const wantsMemory = groups.includes("openllm-memory");
+  if (wantsMemory && !wantsOpenllm) {
+    return servers.filter((s) => s.id === OPENLLM_MEMORY_ENTRY_ID);
+  }
+  if (wantsOpenllm && !wantsMemory) {
+    return servers.filter((s) => s.id !== OPENLLM_MEMORY_ENTRY_ID);
+  }
+  return servers;
+};
+
+/**
  * Kick off `/api/marketplace/launch` whenever the `openllm` OR
- * `openllm-memory` group is requested. Builtins settle with the launch
- * response; upstream dials (only for `openllm`) may lag behind.
+ * `openllm-memory` group is requested, then dial the matching upstreams.
  */
 export const beginMarketplaceLoad = (
   gateway: TMcpGatewayConfig,
@@ -277,21 +269,17 @@ export const beginMarketplaceLoad = (
   const requested = options.groups;
   const wantsLaunch =
     requested.includes("openllm") || requested.includes("openllm-memory");
-  const emptyLaunch: TMarketplaceLaunch = { servers: [], builtins: [] };
+  const emptyLaunch: TMarketplaceLaunch = { servers: [] };
   const launchPromise = wantsLaunch
     ? fetchLaunch(gateway)
     : Promise.resolve(emptyLaunch);
-  const marketplacePromise: Promise<TLaunchConnected> = requested.includes(
-    "openllm",
-  )
+  const marketplacePromise: Promise<TLaunchConnected> = wantsLaunch
     ? launchPromise.then(async (launch) => ({
-        upstreams: await connect(launch.servers),
-        builtins: launch.builtins,
+        upstreams: await connect(
+          filterLaunchServers(launch.servers, requested),
+        ),
       }))
-    : launchPromise.then((launch) => ({
-        upstreams: [] as readonly TUpstream[],
-        builtins: launch.builtins,
-      }));
+    : Promise.resolve({ upstreams: [] as readonly TUpstream[] });
   return { launchPromise, marketplacePromise };
 };
 

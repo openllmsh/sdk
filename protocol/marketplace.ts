@@ -5,14 +5,14 @@ import { Effect, Schema as S } from "effect";
  * verified catalog (JSON in the repo) and, later, private user uploads.
  * See `docs/plan/2026-10-13-marketplace.md` §3.
  *
- * `remote` is a hosted MCP over HTTP; `builtin` is a first-party integration
- * served by OpenLLM itself (e.g. OpenLLM Memory) — launch lists it under
- * `builtins` rather than as an upstream MCP server. `package` and `download`
- * are reserved for the daemon pipeline (P3).
+ * `kind` is transport only:
+ * - `remote` — vendor MCP over HTTP (BYOK and/or included host-key proxy)
+ * - `hosted` — MCP served by OpenLLM at `/api/marketplace/mcp/<id>`
+ * - `package` / `download` — reserved for the daemon pipeline
  */
 export const MarketplaceEntryKind = S.Literals([
   "remote",
-  "builtin",
+  "hosted",
   "package",
   "download",
 ]);
@@ -98,8 +98,8 @@ export const MarketplaceEntry = S.Struct({
   included_usage: S.optional(MarketplaceIncludedUsage),
   /**
    * On for every user until they turn it off — no installation row needed.
-   * Meaningful for included-usage remotes (runs without a key) and for
-   * builtins such as OpenLLM Memory.
+   * Meaningful for included-usage remotes and for hosted entries that need
+   * no user key (e.g. OpenLLM Memory).
    */
   default_enabled: S.optional(S.Boolean),
   /**
@@ -113,9 +113,9 @@ export const MarketplaceEntry = S.Struct({
     S.withDecodingDefault(Effect.succeed(["personal"] as const)),
   ),
   /**
-   * Upstream MCP wiring. Required for `remote` (and reserved kinds); for
-   * `builtin` it is a stub the launch handler ignores — builtins are listed
-   * in `MarketplaceLaunchResponse.builtins` instead.
+   * MCP wiring. `remote` fills `url` / headers (placeholders allowed);
+   * `hosted` only needs `transport` — launch points at the gateway MCP
+   * path for the entry id.
    */
   mcp: MarketplaceMcp,
   config: S.Array(MarketplaceConfigField).pipe(
@@ -146,15 +146,6 @@ export type TMarketplaceLaunchServer = S.Schema.Type<
 
 export const MarketplaceLaunchResponse = S.Struct({
   servers: S.Array(MarketplaceLaunchServer),
-  /**
-   * Enabled first-party builtins (`kind: "builtin"`) the CLI should register
-   * locally — e.g. `"openllm-memory"` for the memory tool group. Omitted or
-   * empty on older gateways; the CLI treats absence as "no builtins".
-   */
-  builtins: S.Array(S.String).pipe(
-    S.optional,
-    S.withDecodingDefault(Effect.succeed([] as const)),
-  ),
 });
 export type TMarketplaceLaunchResponse = S.Schema.Type<
   typeof MarketplaceLaunchResponse

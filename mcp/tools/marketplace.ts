@@ -27,8 +27,6 @@ export type TMarketplaceLaunchServer = {
 
 export type TMarketplaceLaunch = {
   readonly servers: readonly TMarketplaceLaunchServer[];
-  /** Enabled first-party builtins (e.g. `"openllm-memory"`). */
-  readonly builtins: readonly string[];
 };
 
 export type TUpstreamTool = {
@@ -76,7 +74,7 @@ export const upstreamToolName = (id: string, tool: string): string =>
 /** Reserved ids — an integration can never shadow the built-in server. */
 const RESERVED = new Set(["openllm"]);
 
-const EMPTY_LAUNCH: TMarketplaceLaunch = { servers: [], builtins: [] };
+const EMPTY_LAUNCH: TMarketplaceLaunch = { servers: [] };
 
 const isStringRecord = (v: unknown): v is Record<string, string> =>
   v !== null &&
@@ -111,8 +109,8 @@ export type TFetchMarketplaceLaunchParams = {
 
 /**
  * The user's enabled marketplace integrations as ready upstream MCP servers
- * plus first-party builtins (`GET /api/marketplace/launch`). Fails open to
- * none: a slow or older gateway must never block the MCP server.
+ * (`GET /api/marketplace/launch`). Fails open to none: a slow or older
+ * gateway must never block the MCP server.
  */
 export const fetchMarketplaceLaunch = async (
   params: TFetchMarketplaceLaunchParams,
@@ -135,20 +133,12 @@ export const fetchMarketplaceLaunch = async (
     if (!res.ok) return EMPTY_LAUNCH;
     const body =
       res.body !== null && typeof res.body === "object"
-        ? (res.body as { servers?: unknown; builtins?: unknown })
+        ? (res.body as { servers?: unknown })
         : {};
     const servers = Array.isArray(body.servers)
       ? body.servers.filter(isLaunchServer).filter((s) => !RESERVED.has(s.id))
       : [];
-    const builtins = Array.isArray(body.builtins)
-      ? body.builtins.filter(
-          (id): id is string =>
-            typeof id === "string" &&
-            /^[a-z][a-z0-9-]{1,47}$/.test(id) &&
-            !RESERVED.has(id),
-        )
-      : [];
-    return { servers, builtins };
+    return { servers };
   } catch {
     return EMPTY_LAUNCH;
   } finally {

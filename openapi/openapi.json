@@ -43613,7 +43613,7 @@
                             "type": "string",
                             "enum": [
                               "remote",
-                              "builtin",
+                              "hosted",
                               "package",
                               "download"
                             ]
@@ -45454,22 +45454,6 @@
                         ],
                         "additionalProperties": false
                       }
-                    },
-                    "builtins": {
-                      "anyOf": [
-                        {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        {
-                          "type": "null"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
                     }
                   },
                   "required": [
