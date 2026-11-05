@@ -17,7 +17,12 @@ import {
   toB64,
   zero,
 } from "./crypto";
-import { generateX25519Keypair } from "./handoff";
+import type { TX25519Keypair } from "./handoff";
+import {
+  generateResumableX25519Keypair,
+  generateX25519Keypair,
+  importX25519PrivateKey,
+} from "./handoff";
 
 export const CLI_AUTH_SEAL_DOMAIN = "openllm-cli-auth-seal-v1";
 
@@ -142,3 +147,11 @@ export const openCliAuth = async (
     zero(key);
   }
 };
+
+/** Alias kept for CLI call-site parity with the old `cli-auth-crypto` names. */
+export const generateCliAuthKeypair = generateX25519Keypair;
+/** Alias kept for CLI call-site parity with the old `cli-auth-crypto` names. */
+export const openCliAuthSealed = openCliAuth;
+export const importCliAuthPrivateKey = importX25519PrivateKey;
+export const generateResumableCliAuthKeypair = generateResumableX25519Keypair;
+export type TCliAuthKeypair = TX25519Keypair;

@@ -1,12 +1,14 @@
 # `@openllmsh/sdk` architecture
 
-One workspace package, four internal layers. Boundaries that used to be
+One workspace package, six internal layers. Boundaries that used to be
 enforced by separate `package.json` deps are enforced by
 `tests/sdk/layering.test.ts`.
 
 ```
 protocol  ←  wire
           ←  tunnel  ←  vault
+          ←  openapi
+openapi + protocol  ←  mcp
 ```
 
 | Folder | May import | Detail |
@@ -16,6 +18,8 @@ protocol  ←  wire
 | `tunnel/` | `@openllmsh/sdk/protocol`, `effect` | Sans-I/O mux / RTC / Noise. See `tunnel/ARCHITECTURE.md`. |
 | `tunnel/codec*`, `tunnel/channel-envelope` | nothing outside themselves | Relay-safe subpaths. |
 | `vault/` | `@openllmsh/sdk/protocol`, `@openllmsh/sdk/tunnel`, `@noble/ed25519`, `@scure/bip39`, `hash-wasm` | Zero-knowledge crypto. See `vault/ARCHITECTURE.md`. |
+| `openapi/` | `@openllmsh/sdk/protocol` (+ committed JSON) | Spec + operations table + `callOperation`. |
+| `mcp/` | `@openllmsh/sdk/openapi`, `@openllmsh/sdk/protocol`, `@modelcontextprotocol/server` | Tool defs + `createMcpServer`; no `node:*`. |
 
 Rules that apply to every folder:
 

@@ -1,7 +1,8 @@
 # `@openllmsh/sdk`
 
 Public OpenLLM SDK: typed protocol contracts, wire-format transforms, the
-sans-I/O tunnel mux, and zero-knowledge vault crypto. Install from GitHub:
+sans-I/O tunnel mux, zero-knowledge vault crypto, the public OpenAPI surface,
+and MCP tool defs. Install from GitHub:
 
 ```bash
 bun install github:openllmsh/sdk#vX.Y.Z
@@ -25,12 +26,15 @@ import { sealCliAuth, parseApiKey } from "@openllmsh/sdk/vault";
 | `@openllmsh/sdk/wire` | Pure wire-format transforms (Anthropic↔OpenAI adapters, SSE, token estimate). Shared by the cloud proxy and the local daemon. |
 | `@openllmsh/sdk/tunnel` | Sans-I/O binary mux, device grants, RTC helpers, Noise_IK. Relay imports only `/codec` and `/channel-envelope`. |
 | `@openllmsh/sdk/vault` | Zero-knowledge crypto (Argon2id + AES-256-GCM + HKDF), DEK-carrying API keys, X25519 seals. **Only the barrel is stable public API** — `vault/*` subpaths are internal and may change without a major bump. |
+| `@openllmsh/sdk/openapi` | Committed OpenAPI spec + operations table + `callOperation()`. |
+| `@openllmsh/sdk/openapi/spec.json` | The sanitized OpenAPI document (same sanitize as `/api/swagger`). |
+| `@openllmsh/sdk/mcp` | MCP tool defs (native API, memory, HTTP marketplace upstreams) and `createMcpServer` over an injected transport. |
 
 ## Licence
 
 | Path | Licence |
 | --- | --- |
-| `protocol/` (and the package root) | Apache-2.0 |
+| `protocol/`, `openapi/`, `mcp/` (and the package root) | Apache-2.0 |
 | `wire/` | BUSL-1.1 |
 | `tunnel/` | BUSL-1.1 |
 | `vault/` | BUSL-1.1 |

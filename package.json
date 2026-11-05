@@ -15,9 +15,16 @@
     "./tunnel": "./tunnel/index.ts",
     "./tunnel/*": "./tunnel/*.ts",
     "./vault": "./vault/index.ts",
-    "./vault/*": "./vault/*.ts"
+    "./vault/*": "./vault/*.ts",
+    "./cli-release": "./cli-release.ts",
+    "./openapi": "./openapi/index.ts",
+    "./openapi/*": "./openapi/*.ts",
+    "./openapi/spec.json": "./openapi/openapi.json",
+    "./mcp": "./mcp/index.ts",
+    "./mcp/*": "./mcp/*.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
     "@noble/ed25519": "^3.1.0",
     "@scure/bip39": "*",
     "effect": "4.0.6",

@@ -1,6 +1,7 @@
 export * from "./api-key";
 export * from "./argon2";
 export * from "./cli-auth-seal";
+export * from "./cred-seal";
 export * from "./credential";
 export * from "./crypto";
 export * from "./daemon-attest";

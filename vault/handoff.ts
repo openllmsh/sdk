@@ -15,7 +15,7 @@
  *
  * Pure WebCrypto, bytes-in/bytes-out — runs in the browser and in Bun alike,
  * like the rest of this package. X25519 is the same primitive the browser
- * already relies on for daemon sealing (`lib/daemon-seal.ts`).
+ * already relies on for daemon sealing (`./cred-seal.ts`).
  */
 import {
   aesGcmDecrypt,
@@ -67,14 +67,53 @@ export const generateX25519Keypair = async (): Promise<TX25519Keypair> => {
     await subtle().exportKey("pkcs8", pair.privateKey),
   );
   try {
-    const privateKey = await subtle().importKey(
+    const privateKey = await importX25519PrivateKey(toB64(pkcs8));
+    return { publicKeyB64: toB64(spki), privateKey };
+  } finally {
+    zero(pkcs8);
+  }
+};
+
+/** Re-import a PKCS#8 X25519 private key as non-extractable. */
+export const importX25519PrivateKey = async (
+  pkcs8B64: string,
+): Promise<CryptoKey> => {
+  const pkcs8 = fromB64(pkcs8B64);
+  try {
+    return await subtle().importKey(
       "pkcs8",
       pkcs8 as BufferSource,
       { name: "X25519" },
       false,
       ["deriveBits"],
     );
-    return { publicKeyB64: toB64(spki), privateKey };
+  } finally {
+    zero(pkcs8);
+  }
+};
+
+/**
+ * X25519 key pair for resume flows: the private half is also returned as
+ * PKCS#8 base64 so the caller can persist it (0600) and re-import later. The
+ * in-memory key stays non-extractable.
+ */
+export const generateResumableX25519Keypair = async (): Promise<
+  TX25519Keypair & { readonly privateKeyPkcs8B64: string }
+> => {
+  const pair = (await subtle().generateKey({ name: "X25519" }, true, [
+    "deriveBits",
+  ])) as CryptoKeyPair;
+  const spki = new Uint8Array(await subtle().exportKey("spki", pair.publicKey));
+  const pkcs8 = new Uint8Array(
+    await subtle().exportKey("pkcs8", pair.privateKey),
+  );
+  try {
+    const privateKeyPkcs8B64 = toB64(pkcs8);
+    return {
+      publicKeyB64: toB64(spki),
+      privateKey: await importX25519PrivateKey(privateKeyPkcs8B64),
+      privateKeyPkcs8B64,
+    };
   } finally {
     zero(pkcs8);
   }

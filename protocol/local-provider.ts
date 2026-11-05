@@ -38,6 +38,10 @@ export const OAuthProviderSlug = S.Literals([
 ]);
 export type TOAuthProviderSlug = S.Schema.Type<typeof OAuthProviderSlug>;
 
+/** Convenience alias of {@link OAuthProviderSlug.literals} for consumers that
+ *  only need the slug list (MCP tool copy, UI filters). */
+export const OAUTH_PROVIDER_SLUGS = OAuthProviderSlug.literals;
+
 /**
  * Closed set of `local_key` provider slugs: subscription plans whose only
  * credential is an API key. Keys live on the device (multi-account, one slot

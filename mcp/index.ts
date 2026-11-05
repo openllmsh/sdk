@@ -1,0 +1,61 @@
+/**
+ * Public `@openllmsh/sdk/mcp` surface — transport-free MCP tools + server.
+ */
+
+export {
+  handleOpenllmTool,
+  isFreeTierOnlyTool,
+  isMcpListedTool,
+  isMediaOptionalModelTool,
+  isOpenllmTool,
+  MAX_TRANSCRIPTION_BYTES,
+  MODELS_TOOL_NAME,
+  openllmToolDefs,
+  openllmToolDefsAll,
+  prioritizeSubscriptionModels,
+  TRANSCRIPTION_TOOL_NAME,
+  toolNameFor,
+} from "./handle";
+export type {
+  TBeginMarketplaceLoadOptions,
+  TCreateMcpServerOptions,
+  TLaunchConnected,
+  TMarketplaceLoad,
+  TMcpGatewayConfig,
+} from "./server";
+export {
+  attachMarketplaceUpstreams,
+  beginMarketplaceLoad,
+  createMcpServer,
+  OPENLLM_MEMORY_BUILTIN_ID,
+} from "./server";
+export type {
+  TConnectUpstreamOptions,
+  TConnectUpstreamsOptions,
+  TFetchMarketplaceLaunchParams,
+  TMarketplaceLaunch,
+  TMarketplaceLaunchServer,
+  TUpstream,
+  TUpstreamTool,
+} from "./tools/marketplace";
+export {
+  connectUpstream,
+  connectUpstreams,
+  fetchMarketplaceLaunch,
+  LAUNCH_TIMEOUT_MS,
+  UPSTREAM_TOOL_SEPARATOR,
+  upstreamToolName,
+} from "./tools/marketplace";
+export { handleMemoryTool, memoryToolDefs } from "./tools/memory";
+export type {
+  MatchedTeam,
+  Memory,
+  SaveOptions,
+  SearchOptions,
+  SearchResult,
+  WhoamiResult,
+} from "./tools/memory-client";
+export { MemoryClient } from "./tools/memory-client";
+export type { PluginConfig, TProjectRef } from "./tools/memory-config";
+export { COLLECTION_NAME } from "./tools/memory-config";
+export type { TToolResult, TToolResultContent } from "./types";
