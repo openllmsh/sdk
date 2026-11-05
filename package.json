@@ -16,7 +16,6 @@
     "./tunnel/*": "./tunnel/*.ts",
     "./vault": "./vault/index.ts",
     "./vault/*": "./vault/*.ts",
-    "./cli-release": "./cli-release.ts",
     "./openapi": "./openapi/index.ts",
     "./openapi/*": "./openapi/*.ts",
     "./openapi/spec.json": "./openapi/openapi.json",
