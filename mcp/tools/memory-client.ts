@@ -66,6 +66,16 @@ export interface SearchOptions {
 
 const MEMORY_ROOT = "/api/integrations/memory";
 
+/** `diagnostic.status` of a hook-transport error, duck-typed so this module
+ *  never imports the CLI transport class. */
+const statusOf = (error: unknown): number | null => {
+  if (error === null || typeof error !== "object") return null;
+  const diagnostic = (error as { readonly diagnostic?: unknown }).diagnostic;
+  if (diagnostic === null || typeof diagnostic !== "object") return null;
+  const status = (diagnostic as { readonly status?: unknown }).status;
+  return typeof status === "number" ? status : null;
+};
+
 export class MemoryClient {
   private baseUrl: string;
   private apiKey: string;
@@ -120,7 +130,15 @@ export class MemoryClient {
    */
   async isEnabled(): Promise<boolean> {
     const path = `${MEMORY_ROOT}/enabled`;
-    const res = await this.requestOnce("GET", path, undefined);
+    let res: Response;
+    try {
+      res = await this.requestOnce("GET", path, undefined);
+    } catch (error) {
+      // The hook transport throws on non-OK (with `diagnostic.status`)
+      // instead of returning the response; a 404 there still means enabled.
+      if (statusOf(error) === 404) return true;
+      throw error;
+    }
     if (res.ok) {
       const body = (await res.json()) as { enabled?: unknown };
       // Only an explicit `false` disables. Missing/unknown fields (and
