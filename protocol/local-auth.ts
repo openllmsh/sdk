@@ -1,0 +1,254 @@
+/** Dependency-free local auth command descriptors, mirrored into the standalone CLI. */
+export const AUTH_LOCAL_PATH = "/local/auth";
+export const AUTH_LOCAL_VERSION = 1;
+export const AUTH_LOCAL_MAX_BODY_BYTES = 16_384;
+export const AUTH_CODE_MAX_BYTES = 8_192;
+
+export const AUTH_COMMANDS = [
+  {
+    name: "providers",
+    args: "",
+    description: "Discover this daemon provider login methods and actions",
+    mutating: false,
+    provider: "none",
+    fields: [],
+  },
+  {
+    name: "status",
+    args: "[provider] [--account <n>] [--flow-id <id>]",
+    description:
+      "Read local provider state and explicitly check an originating login flow",
+    mutating: false,
+    provider: "optional",
+    fields: ["account", "flow_id"],
+  },
+  {
+    name: "usage",
+    args: "[provider] [--account <n>]",
+    description: "Read cached usage without refreshing credentials or quota",
+    mutating: false,
+    provider: "optional",
+    fields: ["account"],
+  },
+  {
+    name: "refresh",
+    args: "[provider] [--account <n>]",
+    description:
+      "Explicitly refresh usage using the existing manual refresh policy",
+    mutating: true,
+    provider: "optional",
+    fields: ["account"],
+  },
+  {
+    name: "login",
+    args: "<provider> [--account <n>] [--method browser|device]",
+    description:
+      "Start local provider login using its native CLI and vendor consent",
+    mutating: true,
+    provider: "required",
+    fields: ["account", "method"],
+  },
+  {
+    name: "submit-code",
+    args: "<provider> [--account <n>] --flow-id <id>",
+    description:
+      "Submit a paste-back authorization code to the originating login via stdin",
+    mutating: true,
+    provider: "required",
+    fields: ["account", "flow_id", "code"],
+  },
+  {
+    name: "cancel",
+    args: "<provider> [--account <n>] [--flow-id <id>]",
+    description: "Cancel a pending local provider login",
+    mutating: true,
+    provider: "required",
+    fields: ["account", "flow_id"],
+  },
+  {
+    name: "logout",
+    args: "<provider> [--account <n>]",
+    description:
+      "Sign out of a provider on this machine not the OpenLLM account",
+    mutating: true,
+    provider: "required",
+    fields: ["account"],
+  },
+  {
+    name: "add-account",
+    args: "<provider> [--label <label>]",
+    description:
+      "Add another account slot for a provider on this machine, then log in with --account",
+    mutating: true,
+    provider: "required",
+    fields: ["label"],
+  },
+  {
+    name: "remove-account",
+    args: "<provider> --account <n>",
+    description:
+      "Sign out and delete an extra account slot (account 0 is only logged out)",
+    mutating: true,
+    provider: "required",
+    fields: ["account"],
+  },
+  {
+    name: "pin-account",
+    args: "<provider> --account <n>",
+    description:
+      "Try this account first when routing; others still serve as fallback",
+    mutating: true,
+    provider: "required",
+    fields: ["account"],
+  },
+  {
+    name: "unpin-account",
+    args: "<provider>",
+    description:
+      "Clear the pinned account; routing returns to least-remaining-quota order",
+    mutating: true,
+    provider: "required",
+    fields: [],
+  },
+] as const;
+export type TAuthOperation = (typeof AUTH_COMMANDS)[number]["name"];
+export type TLocalAuthMethod = "browser" | "device";
+export type TLocalAuthRequest = {
+  readonly operation: TAuthOperation;
+  readonly provider?: string;
+  readonly method?: TLocalAuthMethod;
+  readonly flow_id?: string;
+  readonly code?: string;
+  /** Device-local account slot (multi-account); absent ⇒ account 0. */
+  readonly account?: number;
+  readonly label?: string;
+};
+
+export const AUTH_ACCOUNT_MAX = 1023;
+export const AUTH_LABEL_MAX_LENGTH = 64;
+
+/** Strict on every surface; provider existence is checked against live daemon delegates. */
+export const parseLocalAuthRequest = (input: unknown): TLocalAuthRequest => {
+  const invalid = (): never => {
+    throw new Error("Invalid local auth request");
+  };
+  if (input === null || typeof input !== "object" || Array.isArray(input))
+    return invalid();
+  const record = input as Record<string, unknown>;
+  const descriptor = AUTH_COMMANDS.find(
+    (item) => item.name === record.operation,
+  );
+  if (descriptor === undefined) return invalid();
+  const allowed = [
+    "operation",
+    ...(descriptor.provider !== "none" ? ["provider"] : []),
+    ...descriptor.fields,
+  ];
+  if (Object.keys(record).some((key) => !allowed.includes(key)))
+    return invalid();
+  if (descriptor.provider === "required" && record.provider === undefined)
+    return invalid();
+  if (
+    record.provider !== undefined &&
+    (typeof record.provider !== "string" ||
+      !/^[a-z][a-z0-9_]{0,63}$/.test(record.provider))
+  )
+    return invalid();
+  if (
+    record.method !== undefined &&
+    record.method !== "browser" &&
+    record.method !== "device"
+  )
+    return invalid();
+  if (
+    record.flow_id !== undefined &&
+    (typeof record.flow_id !== "string" ||
+      !/^[a-zA-Z0-9_-]{1,128}$/.test(record.flow_id))
+  )
+    return invalid();
+  if (record.flow_id !== undefined && record.provider === undefined)
+    return invalid();
+  if (
+    record.account !== undefined &&
+    (typeof record.account !== "number" ||
+      !Number.isSafeInteger(record.account) ||
+      record.account < 0 ||
+      record.account > AUTH_ACCOUNT_MAX)
+  )
+    return invalid();
+  if (
+    descriptor.name === "remove-account" &&
+    (typeof record.account !== "number" || record.account < 1)
+  )
+    return invalid();
+  if (descriptor.name === "pin-account" && record.account === undefined)
+    return invalid();
+  if (
+    record.label !== undefined &&
+    (typeof record.label !== "string" ||
+      record.label.length === 0 ||
+      record.label.length > AUTH_LABEL_MAX_LENGTH ||
+      Array.from(record.label).some(
+        (character) =>
+          character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+      ))
+  )
+    return invalid();
+  if (descriptor.name === "submit-code") {
+    if (
+      record.flow_id === undefined ||
+      typeof record.code !== "string" ||
+      record.code.length === 0 ||
+      new TextEncoder().encode(record.code).length > AUTH_CODE_MAX_BYTES ||
+      Array.from(record.code).some(
+        (character) =>
+          character.charCodeAt(0) <= 32 || character.charCodeAt(0) === 127,
+      )
+    )
+      return invalid();
+  }
+  return record as TLocalAuthRequest;
+};
+
+export const authHelp = (binary: string): string =>
+  `${AUTH_COMMANDS.map((item) => `${binary} auth ${item.name}${item.args ? ` ${item.args}` : ""} [--json]\n  ${item.description}`).join("\n")}\n\nLogin acceptance is not authentication success. Follow vendor consent and check status explicitly.\nsubmit-code reads the code from stdin, never an argument. No remote devices or cloud fallback.\n`;
+
+export const parseAuthArgs = (
+  args: readonly string[],
+  code?: string,
+): TLocalAuthRequest => {
+  const request: Record<string, unknown> = { operation: args[0] };
+  for (let index = 1; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--json") continue;
+    if (
+      arg === "--method" ||
+      arg === "--flow-id" ||
+      arg === "--account" ||
+      arg === "--label"
+    ) {
+      const key =
+        arg === "--method"
+          ? "method"
+          : arg === "--flow-id"
+            ? "flow_id"
+            : arg === "--account"
+              ? "account"
+              : "label";
+      const value = args[index + 1];
+      if (request[key] !== undefined || value === undefined)
+        throw new Error("Missing or repeated auth option");
+      index += 1;
+      request[key] =
+        key === "account" && /^[0-9]{1,4}$/.test(value) ? Number(value) : value;
+    } else if (
+      arg !== undefined &&
+      !arg.startsWith("-") &&
+      request.provider === undefined
+    )
+      request.provider = arg;
+    else throw new Error("Unknown or repeated auth argument");
+  }
+  if (code !== undefined) request.code = code;
+  return parseLocalAuthRequest(request);
+};

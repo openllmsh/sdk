@@ -1,0 +1,215 @@
+import type {
+  TAnthropicContentBlock,
+  TAnthropicResponse,
+  TChatCompletionResponse,
+  TToolCall,
+} from "@openllmsh/sdk/protocol";
+import { ensureCompactionSafeVisibleText } from "../../features/compaction/compaction-text";
+import { parseToolArguments } from "../../lib/canonical/message";
+import {
+  anthropicStopReasonFrom,
+  visibleAnswerAfterThought,
+} from "./anthropic-map";
+import { plainTextFromReasoningItems } from "./reasoning-from-items";
+import {
+  encodeNativeAssistantSignature,
+  encodeReasoningSignature,
+  reasoningItemsFromUnknown,
+} from "./reasoning-signature";
+import { anthropicMessagesUsageFromInclusive } from "./usage";
+
+const extractText = (
+  content: TChatCompletionResponse["choices"][number]["message"]["content"],
+): string => {
+  if (content == null) return "";
+  if (typeof content === "string") return content;
+  return content
+    .filter((p): p is { type: "text"; text: string } => p.type === "text")
+    .map((p) => p.text)
+    .join("");
+};
+
+const toolCallToUseBlock = (call: TToolCall): TAnthropicContentBlock => ({
+  type: "tool_use",
+  id: call.id,
+  name: call.function.name,
+  input: parseToolArguments(call.function.arguments),
+});
+
+/**
+ * Adapt the canonical OpenAI ChatCompletionResponse back to an
+ * Anthropic Messages response for a client that called `/v1/messages`.
+ *
+ * Phase 2: text + tool_use content blocks. The output `content` array
+ * carries both a text block (if any text was generated) and one
+ * tool_use block per OpenAI `tool_calls[*]`.
+ */
+export const toAnthropicMessagesResponse = (
+  resp: TChatCompletionResponse,
+): TAnthropicResponse => {
+  const choice = resp.choices[0];
+  const text = choice !== undefined ? extractText(choice.message.content) : "";
+  const reasoningFromMessage =
+    choice !== undefined &&
+    typeof choice.message.reasoning_content === "string" &&
+    choice.message.reasoning_content.length > 0
+      ? choice.message.reasoning_content
+      : "";
+  const reasoningFromItems =
+    choice !== undefined
+      ? plainTextFromReasoningItems(choice.message.reasoning_items)
+      : "";
+  /** Same fields as ref `_build_reasoning_item` summary text; prefer streamed `reasoning_content` first. */
+  const reasoning =
+    reasoningFromMessage.length > 0 ? reasoningFromMessage : reasoningFromItems;
+  const stopReason =
+    choice !== undefined ? anthropicStopReasonFrom(choice.finish_reason) : null;
+
+  // Round-trip the upstream `reasoning` item(s) (Codex/Responses
+  // `encrypted_content`) through the thinking block's opaque
+  // `signature` so an Anthropic client replays them next turn. Without
+  // this a reasoning upstream loses chain-of-thought state every turn
+  // and loops forever.
+  const nativeSignature = encodeNativeAssistantSignature(
+    choice?.message.reasoning_items,
+  );
+  const reasoningSignature =
+    choice !== undefined
+      ? (nativeSignature ??
+        encodeReasoningSignature(
+          reasoningItemsFromUnknown(choice.message.reasoning_items),
+        ))
+      : null;
+
+  const content: TAnthropicContentBlock[] = [];
+  // Provider-executed hosted searches (e.g. Codex hosted web_search on a
+  // chatgpt hop) → the Anthropic wire's server-tool vocabulary, BEFORE the
+  // text that cites them. `server_tool_use.input` carries the real query the
+  // provider searched; the result CONTENT stays provider-internal (Codex
+  // never exposes result items), so the paired `web_search_tool_result` is
+  // an empty result list — honest: the search ran, its findings ride the
+  // grounded answer text. Clients like Claude Code count these blocks (and
+  // `usage.server_tool_use.web_search_requests`) for their "Did N searches".
+  const serverSearches = choice?.message.server_search_calls ?? [];
+  for (const search of serverSearches) {
+    content.push({
+      type: "server_tool_use",
+      id: search.id,
+      name: "web_search",
+      input: { query: search.query },
+    });
+    content.push({
+      type: "web_search_tool_result",
+      tool_use_id: search.id,
+      content: (search.results ?? []).map((r) => ({
+        type: "web_search_result",
+        url: r.url,
+        title: r.title ?? r.url,
+      })),
+    });
+  }
+  // A `thinking` block is emitted ONLY when it carries a replay-safe
+  // `signature` (the Codex/Responses `encrypted_content` round-trip via
+  // our `openllm-rs1:` codec). Anthropic hard-rejects a signature-less
+  // `thinking` block the moment Claude Code replays the assistant turn
+  // (`messages.N.content.0.thinking.signature: Field required`) — which
+  // then sends Claude Code into a retry storm and breaks prompt-cache
+  // reuse, draining the user's subscription. Reasoning WITHOUT a
+  // signature (every non-Codex reasoner, or a genuine-Anthropic turn
+  // that fell to the canonical path on a fallback hop) is therefore
+  // surfaced as plain visible `text`: always replay-safe.
+  if (reasoningSignature !== null) {
+    content.push({
+      type: "thinking",
+      thinking: reasoning,
+      signature: reasoningSignature,
+    });
+  }
+  const visibleReasoning =
+    reasoningSignature === null && reasoning.length > 0 ? reasoning : "";
+  const answerText =
+    nativeSignature === null &&
+    reasoningSignature !== null &&
+    reasoning.length > 0
+      ? visibleAnswerAfterThought(text, reasoning)
+      : text;
+  if (answerText.length > 0) {
+    const body =
+      visibleReasoning.length > 0
+        ? `${visibleReasoning}\n\n${answerText}`
+        : answerText;
+    content.push({
+      type: "text",
+      text:
+        nativeSignature !== null ? body : ensureCompactionSafeVisibleText(body),
+    });
+  } else if (visibleReasoning.length > 0) {
+    content.push({
+      type: "text",
+      text: ensureCompactionSafeVisibleText(visibleReasoning),
+    });
+  }
+  for (const call of choice?.message.tool_calls ?? []) {
+    content.push(toolCallToUseBlock(call));
+  }
+
+  // Claude Code `/compact` requires a non-empty user-visible `text`
+  // block for thinking-only replies. Never clone a signed summary
+  // (second ⏺). Use the compaction helper's neutral fallback only when
+  // the thinking block has no human summary. Unsigned leftover (Kimi)
+  // is the only visible channel and still becomes text. Same rule as
+  // the streaming adapter.
+  const restatedSignedThought =
+    reasoningSignature !== null && text.length > 0 && answerText.length === 0;
+  // A tool_use turn is exempt from the empty fallback: `/compact` only
+  // reads a text-only reply, and a reasoning model that calls a tool with
+  // no summary is the normal shape — the fallback there printed a stray
+  // "no visible summary text..." block before every tool call.
+  const emittedToolUse = content.some((b) => b.type === "tool_use");
+  if (
+    nativeSignature === null &&
+    !content.some((b) => b.type === "text") &&
+    !restatedSignedThought
+  ) {
+    if (reasoningSignature !== null) {
+      if (reasoning.length === 0 && !emittedToolUse) {
+        content.push({
+          type: "text",
+          text: ensureCompactionSafeVisibleText(""),
+        });
+      }
+    } else if (reasoning.length > 0) {
+      content.push({
+        type: "text",
+        text: ensureCompactionSafeVisibleText(reasoning),
+      });
+    }
+  }
+
+  // Anthropic's `input_tokens` EXCLUDES cache reads/creation; OpenAI's
+  // `prompt_tokens` includes them. Shared helper keeps streaming + direct
+  // Messages encoders on the same contract.
+  const usage = anthropicMessagesUsageFromInclusive({
+    promptTokens: resp.usage.prompt_tokens,
+    completionTokens: resp.usage.completion_tokens,
+    cachedTokens: resp.usage.prompt_tokens_details?.cached_tokens,
+    cacheCreationTokens:
+      resp.usage.prompt_tokens_details?.cache_creation_tokens,
+  });
+
+  return {
+    id: resp.id,
+    type: "message",
+    role: "assistant",
+    model: resp.model,
+    content,
+    stop_reason: stopReason,
+    stop_sequence: null,
+    usage: {
+      ...usage,
+      ...(serverSearches.length > 0
+        ? { server_tool_use: { web_search_requests: serverSearches.length } }
+        : {}),
+    },
+  };
+};

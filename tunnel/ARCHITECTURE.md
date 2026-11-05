@@ -1,0 +1,111 @@
+# `packages/sdk/tunnel` Architecture
+
+> `@openllmsh/sdk/tunnel` is the P1 sans-I/O binary mux used between a consumer,
+> the blind relay, and a serving daemon. It depends directly only on
+> `@openllmsh/sdk/protocol` (which owns the Effect Schema contract): no DOM,
+> WebSocket implementation, Bun, timers, crypto transport, database, proxy
+> pipeline, or framework.
+
+| Layer | Responsibility | Must not know |
+| --- | --- | --- |
+| `codec.ts` | Frozen binary frame layout and bounded JSON/window helpers; codec-only relay subpath (`@openllmsh/sdk/tunnel/codec`) | Stream semantics or payload schemas |
+| `channel-envelope.ts` | 16-byte channel-UUID wrapper around one whole relay-WS mux message (`mux2`), so one relay socket multiplexes several channels | Mux stream/flow semantics or payload schemas |
+| `mux.ts` | Per-stream credits, lifecycle, parity, backpressure; optional sender-side `maxPayloadBytes` for SCTP-sized transports | Tunnel payload shape or host I/O |
+| `peer-link.ts` | Sans-I/O RTC-first peer-link policy: selection, bounded probe budgets, negative-cache classification, pre-dispatch retry safety and idle retention | Browser, daemon, relay, WebSocket or RTC implementation details |
+| `streams.ts` | OPEN/CTRL/RESET helpers and fetch-shaped tunnel stream APIs (`tunnelStream` / `serveStream`) | Relay routing and WebSocket mechanics |
+| `stream-reset-error.ts` | Typed application-level reset error | Mux lifecycle or protocol parsing |
+| `device-grant.ts` | Canonical device-grant envelope encode/decode + message bytes (no crypto) | Vault DEK, node:crypto, host I/O |
+| `team-grant.ts` | Origin-signed team grant encode/decode + HMAC-SHA256 WebCrypto sign/verify (`v:2`) | Vault DEK, DB, host I/O |
+| `rtc-duplex.ts` | ~20-line `TDuplex` over `RTCDataChannel` (DOM or werift) | Mux / payload schemas / auth |
+| `rtc-auth.ts` | Pure fingerprint binding, ICE-server, and SCTP payload-cap helpers; hosts supply seal/open | Crypto implementations, signaling |
+| `rtc-ice.ts` | Daemon-side mDNS ICE-candidate preflight for werift | RTC signaling, mux, or payload schemas |
+
+## Wire contract
+
+Every **bare mux message** is exactly one mux frame. The frozen header is nine
+bytes, big-endian: `type(u8) | stream_id(u32) | length(u32)`, followed by
+exactly `length` payload bytes. Relay-WebSocket messages prepend the 16-byte
+`mux2` channel envelope; the relay validates the envelope and its one mux frame,
+then forwards the original enveloped bytes. RTC carries the bare mux frame.
+There is no byte-stream reassembly.
+
+OPEN, CTRL, and RESET use UTF-8 JSON in P1. DATA is opaque bytes. END has an
+empty payload. WINDOW is exactly one u32 big-endian delta. Numeric constants
+have one home in `codec.ts`:
+
+- maximum payload and implicit OPEN credit: 256 KiB (frozen — do not raise
+  unilaterally);
+- post-OPEN WINDOW boost: +768 KiB (target receive window 1 MiB; skew-safe —
+  old peers just add the WINDOW delta);
+- receiver replenishment threshold: 64 KiB;
+- stream zero is channel CTRL; odd ids are consumer initiated and even ids are
+  daemon initiated.
+
+## Relay blindness
+
+The relay authorizes a channel at setup, then routes binary messages by the
+16-byte envelope and nine-byte frame inspection only (the codec-only
+`@openllmsh/sdk/tunnel/channel-envelope` and `@openllmsh/sdk/tunnel/codec` subpaths;
+never `mux.ts`, JSON, stream kinds, or flow control). Application payloads and
+stream state stay endpoint-private.
+
+Every relay peer speaks `mux2` and prepends the **channel-id envelope**
+(`channel-envelope.ts`) to every binary message, so a socket can hold several
+channels at once. The relay demuxes by the tag only after verifying the sender
+owns that channel; it forwards the enveloped message verbatim to the other
+endpoint. The frozen mux codec is untouched — the envelope wraps one complete
+mux WebSocket message, not a mux frame header. RTC data channels are never
+enveloped (no relay hop — the data channel itself is the channel).
+
+## Landed vs future modules
+
+**Landed on this branch (beyond the frozen mux core):**
+
+- `device-grant.ts` — seed-gated device-access grant wire format (signed by the
+  browser with the phrase-derived device-control key; verified by the daemon).
+  Capability negotiation uses `seedgate1` from `@openllmsh/sdk/protocol`. Every
+  grant that carries `dpk` also signs its `use` — `channel` (a relay-mux
+  `channel_open`, which the relay reads in plaintext), `rtc` (bound to the
+  offer's DTLS fingerprint) or `noise` (bound to the Noise initiator's static
+  key, `noiseGrantBinding`) — and the daemon refuses a grant of one use
+  presented as another, so a harvested `channel_open` grant cannot seed-gate
+  an RTC offer or authenticate a Noise initiator. Grants without `dpk` keep
+  the legacy bytes (no `use`/`bind`) for daemons that predate the fields.
+- `team-grant.ts` — origin-signed team device grant (HMAC-SHA256 WebCrypto,
+  `v:2`). Short-lived `{v, team_id, share_id, consumer, device_user_id,
+  device_key_id, model, n, exp[, cap_tokens]}` envelope for cross-user relay
+  admission and contributor-daemon re-check. Signed under the per-contributor
+  key derived from `NEON_AUTH_COOKIE_SECRET`; daemons pin `team_grant_key` from
+  bootstrap. The relay does not verify — it only requires a non-empty grant for
+  cross-user opens and stamps `peer_user_id`. Unknown future envelope fields are
+  ignored on decode; v1 (Ed25519) is rejected.
+- `device-control.ts` — device-control rotation v2 wire format
+  (`label || 0x00 || {v:2, old, new, cv}`, no timestamp, signed by `old`) and
+  the shared key fingerprint (`keyFingerprint` / `formatKeyFingerprint`).
+- `rtc-auth.ts` / `rtc-duplex.ts` / `rtc-ice.ts` — WebRTC fingerprint-bound
+  offer/answer shapes, ICE-server and SCTP payload-cap helpers, a thin
+  data-channel duplex, and daemon-side mDNS-candidate preflight for werift.
+  Hosts own signaling and crypto: the browser and consuming fleet daemon are
+  offerers, while the serving daemon's `rtc-host` is the answerer. This is the
+  one direct-path stack for browser↔daemon and daemon↔daemon traffic; relay
+  binary mux is the fallback rung when RTC is unavailable (consumers do not use
+  a JSON splice — see `@packages/daemon-relay/ARCHITECTURE.md`).
+
+**P2: agent-sessions E2E (in this release):**
+
+- `secure.ts` — Noise_IK duplex wrapper (P2), with optional 32-byte PSK
+  selecting Noise_IKpsk2 and `deriveTeamTunnelPsk` for team-key HKDF. Secures the mux fallback for
+  agent streams (browser path when RTC unavailable or forced off).
+  `secureMuxStream` encrypts DATA (length-prefixed Noise records) and CTRL
+  (separate key pair); RESET / END / WINDOW stay plaintext. The frozen
+  nine-byte mux layout is unchanged.
+- `streams.ts` — `agentStream` / `acceptAgentStream` plus the shared
+  `agentSecurePrologue` / `AGENT_SECURE_PROLOGUE_INFO` contract
+  (`openllm-agent-secure-v1|<channel_id>|<stream_id>`). Browser initiator and
+  daemon responder MUST import these from here (not duplicate the string).
+  `agentStream` accepts `secure` (initiator wrap) or a custom `prepareStream`.
+
+**Still future (not present):**
+
+- `paths.ts` — multi-path resolver (loopback → LAN → relay) for later direct-path
+  work (P3).

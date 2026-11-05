@@ -1,0 +1,27 @@
+{
+  "name": "@openllmsh/sdk",
+  "version": "0.0.0",
+  "private": false,
+  "type": "module",
+  "exports": {
+    "./protocol": "./protocol/index.ts",
+    "./protocol/*": "./protocol/*.ts",
+    "./wire": "./wire/index.ts",
+    "./wire/adapters/messages": "./wire/adapters/messages/index.ts",
+    "./wire/adapters/responses": "./wire/adapters/responses/index.ts",
+    "./wire/providers/anthropic": "./wire/providers/anthropic/index.ts",
+    "./wire/providers/chatgpt": "./wire/providers/chatgpt/index.ts",
+    "./wire/*": "./wire/*.ts",
+    "./tunnel": "./tunnel/index.ts",
+    "./tunnel/*": "./tunnel/*.ts",
+    "./vault": "./vault/index.ts",
+    "./vault/*": "./vault/*.ts"
+  },
+  "dependencies": {
+    "@noble/ed25519": "^3.1.0",
+    "@scure/bip39": "*",
+    "effect": "4.0.6",
+    "hash-wasm": "*"
+  },
+  "license": "(Apache-2.0 AND BUSL-1.1)"
+}

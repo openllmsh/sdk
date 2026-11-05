@@ -1,0 +1,395 @@
+import type {
+  TChatCompletionRequest,
+  TChatMessage,
+  TResponsesInputItem,
+  TResponsesRequest,
+  TToolCall,
+} from "@openllmsh/sdk/protocol";
+import type { TCanonicalContentPart } from "../../lib/canonical/content-part";
+import {
+  APPLY_PATCH_FUNCTION_NAME,
+  applyPatchFunctionTool,
+  isHostedApplyPatchTool,
+} from "../../lib/responses-apply-patch";
+import {
+  canonicalToolNameOf,
+  joinNamespacedToolName,
+} from "../../lib/responses-namespace";
+
+/**
+ * Inbound adapter: OpenAI **Responses API** request → canonical
+ * ChatCompletion request. The inverse of `toChatGptRequest`
+ * (`@openllmsh/sdk/wire/providers/chatgpt/request.ts`), so a Codex client (which
+ * speaks only the Responses API) can drive the gateway's normal pipeline.
+ *
+ *  - `instructions`            → a leading `system` message.
+ *  - `input` (string)          → a single `user` message.
+ *  - `input` item `message`    → user/assistant/system message (parts →
+ *                                canonical text/image content).
+ *  - `input` item `function_call` → an `assistant` message with one
+ *                                `tool_calls` entry.
+ *  - `input` item `function_call_output` → a `tool` message.
+ *  - `input` item `reasoning`  → carried onto the NEXT assistant message's
+ *                                `reasoning_items` so it round-trips.
+ *  - `input` item `additional_tools` → opaque Responses-tool passthrough only
+ *                                (never a canonical message).
+ *  - flat `tools`/`tool_choice` → canonical wrapped shapes.
+ *  - `reasoning.effort` → `reasoning_effort`; `max_output_tokens` → `max_tokens`.
+ */
+
+// Message items are the only input items carrying `content` with a `role`
+// (their `type` is optional), so select them by `role` rather than `type`.
+type TResponsesContentPart = Extract<
+  TResponsesInputItem,
+  { role: "user" | "assistant" | "system" | "developer"; content: unknown }
+>["content"];
+
+/** Responses content (string | parts) → canonical content (string | parts). */
+const toCanonicalContent = (
+  content: TResponsesContentPart,
+): string | TCanonicalContentPart[] => {
+  if (typeof content === "string") return content;
+  const parts: TCanonicalContentPart[] = [];
+  for (const p of content) {
+    if (p.type === "input_text" || p.type === "output_text") {
+      parts.push({ type: "text", text: p.text });
+    } else if (p.type === "input_image") {
+      parts.push({
+        type: "image_url",
+        image_url: {
+          url: p.image_url,
+          ...(p.detail !== undefined ? { detail: p.detail } : {}),
+        },
+      });
+    } else if (p.type === "input_file") {
+      parts.push({
+        type: "file",
+        file: {
+          ...(p.file_data !== undefined ? { file_data: p.file_data } : {}),
+          ...(p.file_id != null ? { file_id: p.file_id } : {}),
+          ...(p.filename !== undefined ? { filename: p.filename } : {}),
+        },
+      });
+    }
+  }
+  return parts;
+};
+
+/** Flatten Responses content to plain text (for `tool` message bodies). */
+const contentToText = (content: TResponsesContentPart): string => {
+  if (typeof content === "string") return content;
+  return content
+    .map((p) =>
+      p.type === "input_text" || p.type === "output_text" ? p.text : "",
+    )
+    .join("");
+};
+
+/**
+ * Canonical tools — `function` tools, plus every function member of a Codex
+ * `namespace` tool (MCP servers, sub-agents) flattened to
+ * `<namespace>--<name>` (`lib/responses-namespace.ts`; the response encoders
+ * split it back). Namespaces arrive top-level or, on Codex ≥0.147, inside a
+ * leading `additional_tools` input item — both are flattened. Codex's non-function built-ins
+ * (`custom` apply_patch, `web_search`, `image_generation`, `tool_search`) have
+ * no canonical representation, so they're dropped here; they survive for the
+ * chatgpt upstream via the verbatim `responses_tools` passthrough instead (see
+ * `fromResponsesRequest`). For a cross-wire upstream (anthropic / openai-chat)
+ * the non-function tools can't be honoured anyway, so dropping them is correct.
+ */
+type TResponsesToolEntry = NonNullable<TResponsesRequest["tools"]>[number];
+
+const isFunctionTool = (t: unknown): t is TResponsesToolEntry =>
+  typeof t === "object" &&
+  t !== null &&
+  (t as { type?: unknown }).type === "function" &&
+  typeof (t as { name?: unknown }).name === "string";
+
+/** Function members of a namespace tool, renamed to the canonical join. */
+const flattenNamespace = (t: TResponsesToolEntry): TResponsesToolEntry[] => {
+  if (t.type !== "namespace" || typeof t.name !== "string") return [];
+  const members = (t as { tools?: unknown }).tools;
+  if (!Array.isArray(members)) return [];
+  const ns = t.name;
+  return members
+    .filter(isFunctionTool)
+    .map((m) => ({ ...m, name: joinNamespacedToolName(ns, m.name as string) }));
+};
+
+const mapTools = (
+  tools: ReadonlyArray<TResponsesToolEntry>,
+): TChatCompletionRequest["tools"] => {
+  const fns = tools.flatMap((t) =>
+    t.type === "namespace" ? flattenNamespace(t) : isFunctionTool(t) ? [t] : [],
+  );
+  if (fns.length === 0) return undefined;
+  return fns.map((t) => ({
+    type: "function" as const,
+    function: {
+      name: t.name as string,
+      ...(t.description != null ? { description: t.description } : {}),
+      ...(t.parameters !== undefined ? { parameters: t.parameters } : {}),
+      ...(t.strict != null ? { strict: t.strict } : {}),
+    },
+  }));
+};
+
+const mapToolChoice = (
+  choice: TResponsesRequest["tool_choice"],
+): TChatCompletionRequest["tool_choice"] => {
+  if (choice == null || typeof choice === "string") return choice ?? undefined;
+  if (choice.type === "allowed_tools") return choice.mode;
+  if (choice.type === "apply_patch") {
+    return { type: "function", function: { name: APPLY_PATCH_FUNCTION_NAME } };
+  }
+  return { type: "function", function: { name: choice.name } };
+};
+
+type TAllowedToolRef = { readonly type: string; readonly name?: string };
+
+const isAllowedTool = (
+  tool: TResponsesToolEntry,
+  allowed: ReadonlyArray<TAllowedToolRef>,
+): boolean =>
+  allowed.some(
+    (ref) =>
+      ref.type === tool.type &&
+      (ref.name === undefined || ref.name === tool.name),
+  );
+
+/**
+ * A namespace tool narrowed by `allowed_tools`: kept whole when the namespace
+ * itself is allowed, otherwise cut down to its allowed function members (by
+ * bare or canonical joined name), and dropped when none remain.
+ */
+const narrowNamespace = (
+  tool: TResponsesToolEntry,
+  allowed: ReadonlyArray<TAllowedToolRef>,
+): TResponsesToolEntry[] => {
+  if (isAllowedTool(tool, allowed)) return [tool];
+  const members = (tool as { tools?: unknown }).tools;
+  if (typeof tool.name !== "string" || !Array.isArray(members)) return [];
+  const ns = tool.name;
+  const kept = members.filter(
+    (m) =>
+      isFunctionTool(m) &&
+      allowed.some(
+        (ref) =>
+          ref.type === "function" &&
+          (ref.name === m.name ||
+            ref.name === joinNamespacedToolName(ns, m.name as string)),
+      ),
+  );
+  return kept.length === 0 ? [] : [{ ...tool, tools: kept }];
+};
+
+/**
+ * Normalize the declared tools before anything reads them:
+ *  - `tool_choice: allowed_tools` narrows the declared list to the allowed
+ *    subset (no upstream but OpenAI's own API takes the choice itself; the
+ *    narrowed list gives the same turn semantics at the cost of the tool
+ *    prefix's prompt-cache hit).
+ *  - the hosted `apply_patch` tool becomes its function stand-in, which every
+ *    upstream can call (`lib/responses-apply-patch.ts`).
+ */
+/** Tools left callable by `tool_choice: allowed_tools` (all of them otherwise). */
+const narrowToAllowed = (
+  tools: ReadonlyArray<TResponsesToolEntry>,
+  choice: TResponsesRequest["tool_choice"],
+): TResponsesToolEntry[] =>
+  choice != null &&
+  typeof choice !== "string" &&
+  choice.type === "allowed_tools"
+    ? tools.flatMap((t) =>
+        t.type === "namespace"
+          ? narrowNamespace(t, choice.tools)
+          : isAllowedTool(t, choice.tools)
+            ? [t]
+            : [],
+      )
+    : [...tools];
+
+const normalizeTools = (
+  tools: ReadonlyArray<TResponsesToolEntry>,
+  choice: TResponsesRequest["tool_choice"],
+): TResponsesToolEntry[] => {
+  const narrowed = narrowToAllowed(tools, choice);
+  return narrowed.map((t) =>
+    isHostedApplyPatchTool(t) ? applyPatchFunctionTool : t,
+  );
+};
+
+/** A replayed `apply_patch_call` output's status + text as a tool result. */
+const applyPatchOutputText = (
+  status: string | undefined,
+  output: string | null | undefined,
+): string =>
+  output != null && output.length > 0
+    ? `${status ?? "completed"}: ${output}`
+    : (status ?? "completed");
+
+/** Codex sends `minimal`; the canonical enum has it, so pass effort through. */
+const mapEffort = (
+  reasoning: TResponsesRequest["reasoning"],
+): TChatCompletionRequest["reasoning_effort"] => {
+  const e = reasoning?.effort;
+  return e === undefined || e === null ? undefined : e;
+};
+
+export const fromResponsesRequest = (
+  req: TResponsesRequest,
+): TChatCompletionRequest => {
+  const messages: TChatMessage[] = [];
+  // Codex v0.147 moves its namespace-scoped harness tools into leading
+  // `additional_tools` input items. Keep top-level Responses tools and those
+  // leading input items as DISTINCT opaque carriers: their placement changes
+  // the ChatGPT/Codex upstream contract. Flat top-level functions and the
+  // members of namespace tools (from either place) map to canonical `tools`.
+  const responsesTools =
+    req.tools == null ? [] : normalizeTools(req.tools, req.tool_choice);
+  const responsesAdditionalTools: unknown[] = [];
+
+  const instr = req.instructions;
+  if (typeof instr === "string" && instr.trim().length > 0) {
+    messages.push({ role: "system", content: instr });
+  }
+
+  // Buffer reasoning items until the next assistant-role output, which they
+  // precede in the Responses `input` ordering (mirrors `toChatGptRequest`).
+  let pendingReasoning: unknown[] = [];
+  const takeReasoning = (): { reasoning_items?: ReadonlyArray<unknown> } => {
+    if (pendingReasoning.length === 0) return {};
+    const items = pendingReasoning;
+    pendingReasoning = [];
+    return { reasoning_items: items };
+  };
+
+  if (typeof req.input === "string") {
+    messages.push({ role: "user", content: req.input });
+  } else {
+    for (const item of req.input) {
+      if (item.type === "reasoning") {
+        pendingReasoning.push(item);
+      } else if (item.type === "additional_tools") {
+        // Preserve the entire input item rather than hoisting its nested tools.
+        // The Codex upstream distinguishes harness declarations in input from
+        // model-facing tools at the top level. `allowed_tools` narrows it too,
+        // so an excluded harness tool doesn't stay callable through it.
+        const tools = narrowToAllowed(item.tools, req.tool_choice);
+        if (tools.length > 0) {
+          responsesAdditionalTools.push(
+            tools.length === item.tools.length &&
+              tools.every((t, i) => t === item.tools[i])
+              ? item
+              : { ...item, tools },
+          );
+        }
+      } else if (item.type === "function_call") {
+        const toolCall: TToolCall = {
+          id: item.call_id,
+          type: "function",
+          function: {
+            name: canonicalToolNameOf(item.name, item.namespace),
+            arguments: item.arguments,
+          },
+        };
+        messages.push({
+          role: "assistant",
+          content: null,
+          tool_calls: [toolCall],
+          ...takeReasoning(),
+        });
+      } else if (item.type === "function_call_output") {
+        messages.push({
+          role: "tool",
+          tool_call_id: item.call_id,
+          content: contentToText(item.output),
+        });
+      } else if (item.type === "apply_patch_call") {
+        messages.push({
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            {
+              id: item.call_id,
+              type: "function",
+              function: {
+                name: APPLY_PATCH_FUNCTION_NAME,
+                arguments: JSON.stringify(item.operation ?? {}),
+              },
+            },
+          ],
+          ...takeReasoning(),
+        });
+      } else if (item.type === "apply_patch_call_output") {
+        messages.push({
+          role: "tool",
+          tool_call_id: item.call_id,
+          content: applyPatchOutputText(item.status, item.output),
+        });
+      } else {
+        // message item
+        const role = item.role === "developer" ? "system" : item.role;
+        const content = toCanonicalContent(item.content);
+        if (role === "assistant") {
+          messages.push({ role: "assistant", content, ...takeReasoning() });
+        } else {
+          messages.push({ role, content });
+        }
+      }
+    }
+    // Trailing reasoning with no assistant output to attach to.
+    if (pendingReasoning.length > 0) {
+      messages.push({ role: "assistant", content: null, ...takeReasoning() });
+    }
+  }
+
+  const tools = mapTools([
+    ...responsesTools,
+    ...responsesAdditionalTools.flatMap((item) => {
+      const nested = (item as { tools?: unknown }).tools;
+      // Only namespaces: plain harness functions here stay ChatGPT-only.
+      return Array.isArray(nested)
+        ? (nested as TResponsesToolEntry[]).filter(
+            (t) => t.type === "namespace",
+          )
+        : [];
+    }),
+  ]);
+  const toolChoice = mapToolChoice(req.tool_choice);
+  const effort = mapEffort(req.reasoning);
+
+  return {
+    model: req.model,
+    messages,
+    stream: req.stream === true,
+    ...(tools !== undefined ? { tools } : {}),
+    // Carry the ORIGINAL Responses tools verbatim (function + non-function) so
+    // a chatgpt upstream re-emits Codex's apply_patch / web_search / … intact.
+    // Stripped before every openai-family upstream. See the schema field doc.
+    ...(responsesTools.length > 0 ? { responses_tools: responsesTools } : {}),
+    ...(responsesAdditionalTools.length > 0
+      ? { responses_additional_tools: responsesAdditionalTools }
+      : {}),
+    ...(req.client_metadata !== undefined
+      ? { responses_client_metadata: req.client_metadata }
+      : {}),
+    ...(toolChoice !== undefined ? { tool_choice: toolChoice } : {}),
+    ...(effort !== undefined ? { reasoning_effort: effort } : {}),
+    ...(req.max_output_tokens != null
+      ? { max_tokens: req.max_output_tokens }
+      : {}),
+    ...(req.temperature != null ? { temperature: req.temperature } : {}),
+    ...(req.top_p != null ? { top_p: req.top_p } : {}),
+    ...(req.service_tier != null ? { service_tier: req.service_tier } : {}),
+    ...(req.parallel_tool_calls != null
+      ? { parallel_tool_calls: req.parallel_tool_calls }
+      : {}),
+    // Preserve Codex's per-conversation prompt-cache key so the re-encoded
+    // upstream keeps routing to the same cache (rather than synthesizing a new
+    // one). Absent → `toChatGptRequest` derives a stable key from the prefix.
+    ...(req.prompt_cache_key != null
+      ? { prompt_cache_key: req.prompt_cache_key }
+      : {}),
+  };
+};
