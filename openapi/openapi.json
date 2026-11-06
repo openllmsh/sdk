@@ -63488,7 +63488,24 @@
                     "type": "string"
                   },
                   "wrapped_dek": {
-                    "type": "string"
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "sealed_seed": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "vault_version": {
                     "type": "integer",
@@ -63528,7 +63545,6 @@
                   "id",
                   "label",
                   "prf_salt",
-                  "wrapped_dek",
                   "vault_version"
                 ],
                 "additionalProperties": false
