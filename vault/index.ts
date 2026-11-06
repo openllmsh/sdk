@@ -16,4 +16,5 @@ export * from "./pin";
 export * from "./public-key-seal";
 export * from "./seed";
 export * from "./team";
+export * from "./vault-item";
 export * from "./wrapped";

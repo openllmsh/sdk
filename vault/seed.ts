@@ -223,6 +223,7 @@ export const VAULT_BRANCHES = [
   "chats",
   "apps",
   "teams",
+  "keys",
 ] as const;
 
 export type TVaultBranch = (typeof VAULT_BRANCHES)[number];
