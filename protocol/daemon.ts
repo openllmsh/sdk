@@ -75,7 +75,7 @@ export const DaemonCatalogEntry = S.Struct({
    *
    * Optional, like `caps`: an older cloud omits it and a newer daemon
    * reads absent as UNKNOWN, keeping today's provider-derived defaults.
-   * Delivered over the AUTHENTICATED bootstrap, never the signed 307 —
+   * Delivered over the AUTHENTICATED bootstrap, never the signed plan —
    * that payload covers only plan/pmids/origin, so anything appended
    * there would be caller-controllable and unsigned.
    */
@@ -96,7 +96,7 @@ export const DaemonBootstrap = S.Struct({
    *
    * Optional: an older cloud omits it and the daemon simply resolves no
    * defaults (absent = unknown = permissive, today's behaviour). Rules
-   * are DATA on the authenticated bootstrap — never the signed 307.
+   * are DATA on the authenticated bootstrap — never the signed plan.
    */
   caps_defaults: S.optional(S.Array(ModelCapsDefaultRule)),
   user_fallback_groups: S.Array(FallbackGroup),
@@ -106,9 +106,9 @@ export const DaemonBootstrap = S.Struct({
    * historical hop-to-larger-context behaviour. */
   context_overflow_strategy: S.optional(ContextOverflowStrategy),
   /**
-   * Per-user HMAC key the daemon uses to VERIFY the `?__plan=` the cloud
-   * 307s to it (the cloud signs with the same key). Lets the daemon reject
-   * a `__plan` forged by another local process. Null when the cloud has no
+   * Per-user HMAC key the daemon uses to VERIFY the plan `/api/daemon/plan`
+   * returns (the cloud signs with the same key). Lets the daemon reject
+   * a plan forged by another local process. Null when the cloud has no
    * signing secret configured (dev) — the daemon then accepts unsigned
    * plans. See `docs/proposals/coreless-daemon-passthrough.md` §9.
    */
@@ -172,7 +172,7 @@ export const DaemonBootstrap = S.Struct({
    * Cloud-controlled toggle for the daemon's SIGNED-PLAN CACHE
    * (`DAEMON_PLAN_CACHE` on the cloud, default ON — an explicit `0`/`false`
    * disables): when true, a `/v1/*` request that reaches the daemon
-   * directly WITHOUT a `?__plan=` may be served against the most recent
+   * directly may be served against the most recent
    * cloud-signed plan tuple for the same model alias within a short TTL,
    * skipping the per-request cloud round trip. The signature is still
    * verified per request (the cached tuple is exactly what the cloud
@@ -1310,13 +1310,13 @@ export const DaemonStatus = S.Struct({
 export type TDaemonStatus = S.Schema.Type<typeof DaemonStatus>;
 
 /**
- * Canonical payload the cloud HMAC-signs for the same-machine 307, and the
- * daemon re-derives to verify it (proposals: same-machine-307-redirect §9 +
- * daemon-presence-without-heartbeat). Order + separators are load-bearing —
- * both sides MUST assemble it identically, so it lives here, shared. Covers:
- * the ordered `__plan` (provider/model ids), the parallel `__pmids` (concrete
- * upstream `provider_model_id`s, so the daemon serves catalog-free), and the
- * `__origin` (the deployment that issued the 307, so the daemon forwards +
+ * Canonical payload the cloud HMAC-signs for a daemon plan
+ * (`/api/daemon/plan`), and the daemon re-derives to verify it. Order +
+ * separators are load-bearing — both sides MUST assemble it identically, so
+ * it lives here, shared. Covers: the ordered `plan` (provider/model ids), the
+ * parallel `pmids` (concrete upstream `provider_model_id`s, so the daemon
+ * serves catalog-free), and the `origin` (the deployment that issued the
+ * plan, so the daemon forwards +
  * records back to it). Signing the lot makes the upstream ids and the
  * forward/record target tamper-evident.
  */
@@ -1355,21 +1355,20 @@ export const daemonPlanSigningPayload = (
 
 // ─── GET /api/daemon/plan (daemon → cloud) ───────────────────────────
 //
-// The local-first gateway's plan fetch: the SAME signed tuple a
-// same-machine 307 carries in its query, returned as JSON so a daemon
-// serving a DIRECT client request can obtain a plan without the request
-// body transiting the cloud. The daemon verifies `sig` with the
+// The local-first gateway's plan fetch: the signed plan tuple, returned as
+// JSON so a daemon serving a DIRECT client request can obtain a plan without
+// the request body transiting the cloud. The daemon verifies `sig` with the
 // bootstrap-delivered per-user key (`planSignatureOk`) before caching or
-// executing — the endpoint earns no more trust than a 307 does. See
+// executing. See
 // `docs/proposals/local-first-gateway.md` §4.1. For capped keys, repeated
 // `exclude=<model>` query parameters skip already-failed hops; uncapped keys
 // ignore them.
 export const DaemonPlanResponse = S.Struct({
-  /** Comma-joined ordered `provider/model` chain (the 307's `__plan`). */
+  /** Comma-joined ordered `provider/model` chain. */
   plan: S.String,
-  /** Parallel concrete `provider_model_id`s (the 307's `__pmids`). */
+  /** Parallel concrete `provider_model_id`s. */
   pmids: S.String,
-  /** The issuing deployment's origin (the 307's `__origin`). */
+  /** The issuing deployment's origin. */
   origin: S.String,
   /** Context-overflow strategy for this plan. Absent means hop-to-larger-context. */
   context_overflow_strategy: S.optional(ContextOverflowStrategy),
