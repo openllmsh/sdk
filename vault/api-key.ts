@@ -14,6 +14,7 @@ import {
   toB64,
   toB64Url,
 } from "./crypto";
+import { sealVaultText } from "./vault-item";
 import { joinSealed, splitSealed } from "./wrapped";
 
 const DEK_BYTES = 32;
@@ -129,20 +130,16 @@ export const mintApiKey = async (
     const ct = await aesGcmEncrypt(wrapKey, nonce, dek);
     const dekForKey = joinSealed(nonce, ct);
     const skLlm = `${OPENLLM_API_KEY_PREFIX}${apiKeyId}.${toB64Url(apiKeySecret)}`;
-    // Wrap the full token under DEK so the dashboard can re-display
-    // it later. Distinct nonce — never reuse with `dek_for_key`.
-    const secretNonce = randomBytes(NONCE_BYTES);
-    const secretCt = await aesGcmEncrypt(
-      dek,
-      secretNonce,
-      new TextEncoder().encode(skLlm),
-    );
+    // Wrap the full token under the `keys` branch so the dashboard can
+    // re-display it later. Distinct from `dek_for_key` (still under the
+    // API-key wrap key — the server needs the root).
+    const sealedSecret = await sealVaultText(dek, { branch: "keys" }, skLlm);
     return {
       row: {
         id: apiKeyId,
         dek_for_key: toB64(dekForKey),
-        secret_ciphertext: toB64(secretCt),
-        secret_nonce: toB64(secretNonce),
+        secret_ciphertext: sealedSecret.ciphertext,
+        secret_nonce: sealedSecret.nonce,
         vault_version: vaultVersion,
       },
       sk_llm: skLlm,
@@ -180,16 +177,11 @@ export const rewrapApiKey = async (
       nonce,
       await aesGcmEncrypt(wrapKey, nonce, newDek),
     );
-    const secretNonce = randomBytes(NONCE_BYTES);
-    const secretCt = await aesGcmEncrypt(
-      newDek,
-      secretNonce,
-      new TextEncoder().encode(skLlm),
-    );
+    const sealedSecret = await sealVaultText(newDek, { branch: "keys" }, skLlm);
     return {
       dek_for_key: toB64(dekForKey),
-      secret_ciphertext: toB64(secretCt),
-      secret_nonce: toB64(secretNonce),
+      secret_ciphertext: sealedSecret.ciphertext,
+      secret_nonce: sealedSecret.nonce,
     };
   } finally {
     wrapKey.fill(0);

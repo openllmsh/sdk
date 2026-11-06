@@ -41,7 +41,21 @@ import {
   toB64Url,
   zero,
 } from "./crypto";
+import { openVaultBytes, sealVaultBytes, VAULT_ITEM_TAG } from "./vault-item";
 import { joinSealed, splitSealed } from "./wrapped";
+
+/** ASCII `k1:` — same tag vault-item puts on a tree-sealed nonce string. */
+const TEAM_KEY_TREE_TAG = new TextEncoder().encode(VAULT_ITEM_TAG);
+
+const startsWithTeamKeyTreeTag = (sealed: Uint8Array): boolean => {
+  if (sealed.length < TEAM_KEY_TREE_TAG.length + NONCE_BYTES + 16) {
+    return false;
+  }
+  for (let i = 0; i < TEAM_KEY_TREE_TAG.length; i++) {
+    if (sealed[i] !== TEAM_KEY_TREE_TAG[i]) return false;
+  }
+  return true;
+};
 
 const NONCE_BYTES = 12;
 const TEAM_KEY_BYTES = 32;
@@ -70,23 +84,57 @@ export const TEAM_CRED_HKDF_INFO = "openllm-team-cred-v1";
 export const generateTeamKey = (): Uint8Array => randomBytes(TEAM_KEY_BYTES);
 
 /**
- * Seal T under a member's personal DEK → `IV || ct` bytes for
+ * Seal T under the personal vault's `teams` branch → bytes for
  * `team_members.sealed_team_key`.
+ *
+ * Wire layout (single bytea, no separate nonce column):
+ *   - tree (current): `ASCII "k1:" || nonce(12) || ct` — AES-GCM under the
+ *     `teams` branch key derived from the root (DEK today);
+ *   - legacy: `nonce(12) || ct` — AES-GCM under the root DEK directly.
+ * {@link openTeamKey} reads both; a legacy blob whose first three bytes
+ * happen to match the tag is tried as tree first and falls back to the
+ * DEK on auth failure.
  */
 export const sealTeamKey = async (
   dek: Uint8Array,
   teamKey: Uint8Array,
 ): Promise<Uint8Array> => {
-  const nonce = randomBytes(NONCE_BYTES);
-  const ct = await aesGcmEncrypt(dek, nonce, teamKey);
-  return joinSealed(nonce, ct);
+  const item = await sealVaultBytes(dek, { branch: "teams" }, teamKey);
+  const nonce = fromB64(item.nonce.slice(VAULT_ITEM_TAG.length));
+  const ct = fromB64(item.ciphertext);
+  const out = new Uint8Array(
+    TEAM_KEY_TREE_TAG.length + nonce.length + ct.length,
+  );
+  out.set(TEAM_KEY_TREE_TAG, 0);
+  out.set(nonce, TEAM_KEY_TREE_TAG.length);
+  out.set(ct, TEAM_KEY_TREE_TAG.length + nonce.length);
+  return out;
 };
 
-/** Open a `sealed_team_key` blob under the personal DEK. Caller zeros T. */
+/** Open a `sealed_team_key` blob under the personal root key. Caller zeros T. */
 export const openTeamKey = async (
   dek: Uint8Array,
   sealed: Uint8Array,
 ): Promise<Uint8Array> => {
+  if (startsWithTeamKeyTreeTag(sealed)) {
+    const nonce = sealed.slice(
+      TEAM_KEY_TREE_TAG.length,
+      TEAM_KEY_TREE_TAG.length + NONCE_BYTES,
+    );
+    const ciphertext = sealed.slice(TEAM_KEY_TREE_TAG.length + NONCE_BYTES);
+    try {
+      return await openVaultBytes(
+        dek,
+        { branch: "teams" },
+        {
+          nonce: `${VAULT_ITEM_TAG}${toB64(nonce)}`,
+          ciphertext: toB64(ciphertext),
+        },
+      );
+    } catch {
+      // Tag collision on a legacy blob — fall through.
+    }
+  }
   const { nonce, ciphertext } = splitSealed(sealed, "sealed_team_key");
   return aesGcmDecrypt(dek, nonce, ciphertext);
 };

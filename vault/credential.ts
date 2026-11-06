@@ -14,11 +14,12 @@ export type TEncryptedCredential = {
 };
 
 /**
- * Encrypt a credential plaintext under the user's DEK. Output is a
- * `{ciphertext, nonce}` pair of base64 strings ready to be POSTed
- * to `/api/credentials`. The plaintext shape is provider-specific —
- * a raw `api_key` string for most providers, `JSON.stringify(aws)`
- * for Bedrock, `JSON.stringify(oauth)` for OAuth providers.
+ * Encrypt a credential plaintext under the user's DEK (root key).
+ *
+ * @deprecated Seal vault data with {@link sealVaultText} /
+ *   {@link sealVaultBytes} from `./vault-item` under the matching branch
+ *   (`credentials`, `memory`, `chats`, `apps`, `keys`, `teams`). Kept for
+ *   legacy-path tests and the one-week read sunset of untagged rows.
  */
 export const encryptCredential = async (
   dek: Uint8Array,
@@ -34,10 +35,11 @@ export const encryptCredential = async (
 };
 
 /**
- * Decrypt a credential row. Used by the vault reset flow
- * (`components/vault/vault-rotate-dialog.tsx`) when
- * the user opts to re-encrypt existing credentials under a new DEK,
- * and by any future browser-side "view raw credential" affordance.
+ * Decrypt a credential row sealed directly under the DEK.
+ *
+ * @deprecated Open vault data with {@link openVaultText} /
+ *   {@link openVaultBytes} from `./vault-item` (handles both tree-tagged
+ *   and legacy untagged items). Kept for legacy-path tests.
  */
 export const decryptCredential = async (
   dek: Uint8Array,
