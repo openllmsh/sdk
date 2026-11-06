@@ -146,6 +146,8 @@ export type TMarketplaceLaunchServer = S.Schema.Type<
 
 export const MarketplaceLaunchResponse = S.Struct({
   servers: S.Array(MarketplaceLaunchServer),
+  /** Read only by binaries up to v2.10.4; current ones use `servers`. */
+  builtins: S.optional(S.Array(S.String)),
 });
 export type TMarketplaceLaunchResponse = S.Schema.Type<
   typeof MarketplaceLaunchResponse

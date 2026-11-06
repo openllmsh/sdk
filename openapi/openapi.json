@@ -51187,6 +51187,19 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "builtins": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
