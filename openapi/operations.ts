@@ -1942,6 +1942,51 @@ export const API_OPERATIONS: readonly TApiOperation[] = [
     "hasBody": false
   },
   {
+    "id": "vault.migrateCommit",
+    "method": "post",
+    "path": "/vault/migrate/commit",
+    "summary": "",
+    "tags": [
+      "vault"
+    ],
+    "pathParams": [],
+    "queryParams": [],
+    "hasBody": true
+  },
+  {
+    "id": "vault.migrateRows",
+    "method": "get",
+    "path": "/vault/migrate/rows",
+    "summary": "",
+    "tags": [
+      "vault"
+    ],
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "kind",
+        "required": true
+      },
+      {
+        "name": "cursor",
+        "required": false
+      }
+    ],
+    "hasBody": false
+  },
+  {
+    "id": "vault.migrateStage",
+    "method": "post",
+    "path": "/vault/migrate/stage",
+    "summary": "",
+    "tags": [
+      "vault"
+    ],
+    "pathParams": [],
+    "queryParams": [],
+    "hasBody": true
+  },
+  {
     "id": "vault.passkeyList",
     "method": "get",
     "path": "/vault/passkey",

@@ -17,4 +17,5 @@ export * from "./public-key-seal";
 export * from "./seed";
 export * from "./team";
 export * from "./vault-item";
+export * from "./vault-migrate-digest";
 export * from "./wrapped";
