@@ -15079,6 +15079,16 @@
                         }
                       ]
                     },
+                    "vault_key_id": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "cookie_consent_version": {
                       "anyOf": [
                         {
@@ -15212,6 +15222,7 @@
                     "wrapped_dek",
                     "wrap_salt_next",
                     "wrapped_dek_next",
+                    "vault_key_id",
                     "cookie_consent_version",
                     "cookie_consent_value",
                     "cookie_consent_at",

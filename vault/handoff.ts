@@ -27,15 +27,21 @@ import {
   zero,
 } from "./crypto";
 import { unlockDek } from "./derive";
+import {
+  deriveVaultDek,
+  deriveVaultKeyId,
+  SEED_BYTES,
+  seedToPhrase,
+} from "./seed";
 
 export const HANDOFF_HKDF_INFO = "openllm-vault-handoff-v1";
 export const HANDOFF_CODE_INFO = "openllm-vault-handoff-code-v1";
 /** Digits in the verification code both screens show. */
 export const HANDOFF_CODE_DIGITS = 6;
 
-const DEK_BYTES = 32;
 const NONCE_BYTES = 12;
-const PAYLOAD_VERSION = 1;
+/** v2 carries the vault seed only; v1 (DEK + phrase) is refused. */
+const PAYLOAD_VERSION = 2;
 
 const subtle = (): SubtleCrypto => {
   const s = globalThis.crypto?.subtle;
@@ -129,13 +135,12 @@ export type THandoffBinding = {
 };
 
 /**
- * What travels: the DEK and the phrase. `phrase` stays nullable on the wire
- * only so a phrase-less payload decodes into something `acceptHandoff` can
- * refuse by name.
+ * What travels: the vault seed, and nothing else — the new device derives the
+ * vault key (and the device-control key) from it, exactly as an unlock does
+ * (docs/plans/seed-only-vault.md).
  */
 export type THandoffPayload = {
-  readonly dek: Uint8Array;
-  readonly phrase: string | null;
+  readonly seed: Uint8Array;
 };
 
 /** The wire form of a sealed handoff — three base64 strings. */
@@ -200,16 +205,16 @@ const deriveHandoffKey = async (
 };
 
 /**
- * Seal the DEK (and phrase) to the requester. Run on the APPROVING device.
- * The caller keeps ownership of `payload.dek` — it is copied into the
- * plaintext, and the plaintext buffer is zeroed here.
+ * Seal the vault seed to the requester. Run on the APPROVING device. The
+ * caller keeps ownership of `payload.seed` — it is copied into the plaintext,
+ * and the plaintext buffer is zeroed here.
  */
 export const sealHandoff = async (
   binding: THandoffBinding,
   payload: THandoffPayload,
 ): Promise<TSealedHandoff> => {
-  if (payload.dek.length !== DEK_BYTES) {
-    throw new Error("handoff DEK must be 32 bytes");
+  if (payload.seed.length !== SEED_BYTES) {
+    throw new Error(`handoff seed must be ${SEED_BYTES} bytes`);
   }
   const eph = await generateX25519Keypair();
   const key = await deriveHandoffKey(
@@ -224,8 +229,7 @@ export const sealHandoff = async (
       user_id: binding.userId,
       request_id: binding.requestId,
       vault_version: binding.vaultVersion,
-      dek: toB64(payload.dek),
-      ...(payload.phrase !== null ? { phrase: payload.phrase } : {}),
+      seed: toB64(payload.seed),
     }),
   );
   try {
@@ -249,7 +253,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
  * Open a sealed handoff with the requester's private key. Run on the NEW
  * device. Throws on any failure — a wrong key, a tampered byte, a ciphertext
  * bound to another request/account/generation, or a malformed payload. The
- * caller owns (and must eventually `zero()` or hand to the session) the DEK.
+ * caller owns (and must eventually `zero()`) the seed.
  */
 export const openHandoff = async (
   binding: THandoffBinding,
@@ -280,80 +284,79 @@ export const openHandoff = async (
       parsed.user_id !== binding.userId ||
       parsed.request_id !== binding.requestId ||
       parsed.vault_version !== binding.vaultVersion ||
-      typeof parsed.dek !== "string" ||
-      (parsed.phrase !== undefined && typeof parsed.phrase !== "string")
+      typeof parsed.seed !== "string"
     ) {
       throw new Error("handoff payload does not match its binding");
     }
-    const dek = fromB64(parsed.dek);
-    if (dek.length !== DEK_BYTES) {
-      zero(dek);
-      throw new Error("handoff payload did not contain a 32-byte key");
+    const seed = fromB64(parsed.seed);
+    if (seed.length !== SEED_BYTES) {
+      zero(seed);
+      throw new Error("handoff payload did not contain a vault seed");
     }
-    return {
-      dek,
-      phrase: typeof parsed.phrase === "string" ? parsed.phrase : null,
-    };
+    return { seed };
   } finally {
     zero(plaintext);
   }
 };
 
-const bytesEqual = (a: Uint8Array, b: Uint8Array): boolean => {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= (a[i] as number) ^ (b[i] as number);
-  }
-  return diff === 0;
-};
-
 /**
- * An opened handoff the new device may install: a DEK re-derived from the
- * phrase against the server's `wrapped_dek`, and that phrase.
- */
-export type TAcceptedHandoff = {
-  readonly dek: Uint8Array;
-  readonly phrase: string;
-};
-
-/**
- * Check an opened payload before the session gets it. The DEK must be exactly
- * what the payload's phrase unwraps from the server's `wrapped_dek` — the one
- * anchor a session-cookie holder cannot swap without a full, visible vault
- * reset. Anything else is an approval from somebody who does not hold this
- * vault, and throws (the payload's DEK is zeroed).
+ * What the new device checks a handed-off seed against — the server-side
+ * anchor of the account's vault, by its format:
  *
- * A payload WITHOUT a phrase is refused too. Nothing else server-side can
- * vouch for a DEK: a cookie holder can mint keys with device-access verifiers,
- * file credentials and passkey rows of its own choosing, so a phrase-less DEK
- * rests on the verification code alone — and a cookie holder that approves
- * first never needs the user to compare it. Approvers only answer when they
- * keep the phrase (`useVaultHandoffApproval`), so this is a backstop.
+ *   - `seed`: the public `users.vault_key_id` — the seed must derive it;
+ *   - `legacy` (until the sunset): `wrap_salt` + `wrapped_dek` — the seed's
+ *     phrase must open them, and the vault key is the one inside.
+ *
+ * Neither anchor can be swapped by a session-cookie holder without a full,
+ * visible vault reset, so a seed that matches is this vault's seed.
+ */
+export type THandoffAnchor =
+  | { readonly kind: "seed"; readonly vaultKeyId: string }
+  | {
+      readonly kind: "legacy";
+      readonly wrapSaltB64: string;
+      readonly wrappedDekB64: string;
+    };
+
+/** An opened handoff the new device may install. The caller zeroes both. */
+export type TAcceptedHandoff = {
+  readonly seed: Uint8Array;
+  readonly dek: Uint8Array;
+};
+
+/**
+ * Check an opened seed against the vault's anchor before the session gets it,
+ * and return the vault key it opens. Throws (the seed zeroed) when the seed
+ * belongs to another vault — an approval from somebody who does not hold this
+ * one.
  */
 export const acceptHandoff = async (
   opened: THandoffPayload,
-  wrapSaltB64: string,
-  wrappedDekB64: string,
+  anchor: THandoffAnchor,
 ): Promise<TAcceptedHandoff> => {
-  if (opened.phrase === null) {
-    zero(opened.dek);
-    throw new Error("handoff carries no phrase to verify its DEK against");
-  }
-  let derived: Uint8Array;
+  const { seed } = opened;
   try {
-    derived = await unlockDek(opened.phrase, wrapSaltB64, wrappedDekB64);
-  } catch {
-    zero(opened.dek);
-    throw new Error("handoff phrase does not open this vault");
+    if (anchor.kind === "seed") {
+      if ((await deriveVaultKeyId(seed)) !== anchor.vaultKeyId) {
+        throw new Error("handoff seed does not match this vault");
+      }
+      return { seed, dek: await deriveVaultDek(seed) };
+    }
+    let dek: Uint8Array;
+    try {
+      dek = await unlockDek(
+        seedToPhrase(seed),
+        anchor.wrapSaltB64,
+        anchor.wrappedDekB64,
+      );
+    } catch {
+      throw new Error("handoff seed does not open this vault");
+    }
+    return { seed, dek };
+  } catch (err) {
+    zero(seed);
+    throw err;
   }
-  if (!bytesEqual(derived, opened.dek)) {
-    zero(derived);
-    zero(opened.dek);
-    throw new Error("handoff DEK does not match this vault");
-  }
-  zero(opened.dek);
-  return { dek: derived, phrase: opened.phrase };
 };
 
 /**
