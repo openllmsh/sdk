@@ -205,3 +205,67 @@ export const openSeedWithPrf = async (
     zero(key);
   }
 };
+
+/**
+ * The vault key tree (docs/plans/seed-only-vault.md §2a). Each branch key is
+ * HKDF from the vault root key (the DEK) under a fixed label; each leaf is
+ * HKDF from its branch under the item's stable id. A parent derives all its
+ * children, a child never its parent or siblings, and nothing is stored.
+ *
+ * A full-access holder of the root (the browser after unlock, every default
+ * API key) derives every branch, so by default every key reads what any other
+ * wrote — today's behaviour. Leaf ids must never depend on which key wrote the
+ * item (a memory's space is its scope, a chat's leaf is its session id).
+ */
+export const VAULT_BRANCHES = [
+  "credentials",
+  "memory",
+  "chats",
+  "apps",
+  "teams",
+] as const;
+
+export type TVaultBranch = (typeof VAULT_BRANCHES)[number];
+
+/** HKDF info prefix for a branch; the branch name follows. */
+export const VAULT_BRANCH_HKDF_INFO = "openllm-vault-branch-v1";
+/** HKDF info prefix for a leaf; the branch and the leaf id follow. */
+export const VAULT_LEAF_HKDF_INFO = "openllm-vault-leaf-v1";
+
+const requireKey = (key: Uint8Array, label: string): void => {
+  if (key.length !== DEK_BYTES) throw new Error(`${label} must be 32 bytes`);
+};
+
+/** A branch key from the vault root key (the DEK). The caller zeroes it. */
+export const deriveBranchKey = async (
+  rootKey: Uint8Array,
+  branch: TVaultBranch,
+): Promise<Uint8Array> => {
+  requireKey(rootKey, "vault root key");
+  return hkdfSha256(
+    rootKey,
+    saltBytes(),
+    JSON.stringify([VAULT_BRANCH_HKDF_INFO, branch]),
+    DEK_BYTES,
+  );
+};
+
+/**
+ * A leaf key from its branch key and the item's stable id (session id, memory
+ * space). JSON-encoded info, so no id can collide with another branch's.
+ * The caller zeroes it.
+ */
+export const deriveLeafKey = async (
+  branchKey: Uint8Array,
+  branch: TVaultBranch,
+  leafId: string,
+): Promise<Uint8Array> => {
+  requireKey(branchKey, "branch key");
+  if (leafId.length === 0) throw new Error("leaf id must not be empty");
+  return hkdfSha256(
+    branchKey,
+    saltBytes(),
+    JSON.stringify([VAULT_LEAF_HKDF_INFO, branch, leafId]),
+    DEK_BYTES,
+  );
+};
