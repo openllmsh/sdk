@@ -70180,12 +70180,6 @@
                     "search_provider": {
                       "type": "string"
                     },
-                    "integration_allow_list": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
                     "default_tier_chains": {
                       "anyOf": [
                         {
@@ -70246,8 +70240,7 @@
                     "required_provider_terms",
                     "default_aliases",
                     "model_catalog",
-                    "search_provider",
-                    "integration_allow_list"
+                    "search_provider"
                   ],
                   "additionalProperties": false
                 }

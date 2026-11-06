@@ -255,7 +255,6 @@ export const GlobalConfig = S.Struct({
   default_aliases: S.Record(S.String, S.String),
   model_catalog: S.Array(ExtendedModel),
   search_provider: S.String,
-  integration_allow_list: S.Array(S.String),
   default_tier_chains: S.optional(DefaultTierChains),
 });
 export type TGlobalConfig = S.Schema.Type<typeof GlobalConfig>;
