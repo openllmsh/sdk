@@ -1824,6 +1824,18 @@ export const API_OPERATIONS: readonly TApiOperation[] = [
     "hasBody": true
   },
   {
+    "id": "vault.create",
+    "method": "post",
+    "path": "/vault/create",
+    "summary": "",
+    "tags": [
+      "vault"
+    ],
+    "pathParams": [],
+    "queryParams": [],
+    "hasBody": true
+  },
+  {
     "id": "deviceControl.put",
     "method": "put",
     "path": "/vault/device-control",
