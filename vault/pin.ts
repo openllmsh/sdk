@@ -94,3 +94,60 @@ export const unwrapDekWithPin = async (
  */
 export const pinBlobNeedsRewrap = (blob: TPinWrappedDek): boolean =>
   decodeKdfWrapped(blob.wrapped_b64, "pin blob").version < CURRENT_KDF_VERSION;
+
+/**
+ * The vault seed under a PIN — this browser's PIN unlock in the seed-only
+ * vault (docs/plans/seed-only-vault.md). Same Argon2id cost and version stamp
+ * as the DEK blob; the AAD keeps a seed blob and a DEK blob from ever being
+ * passed off as each other.
+ */
+export type TPinWrappedSeed = TPinWrappedDek;
+
+const PIN_SEED_AAD = new TextEncoder().encode("openllm-vault-seed-pin-v1");
+const SEED_BYTES = 16;
+
+export const wrapSeedWithPin = async (
+  seed: Uint8Array,
+  pin: string,
+): Promise<TPinWrappedSeed> => {
+  if (seed.length !== SEED_BYTES)
+    throw new Error("vault seed must be 16 bytes");
+  const pinSalt = randomBytes(PIN_SALT_BYTES);
+  const pinKey = await deriveWrapKey(normalizePin(pin), pinSalt);
+  try {
+    const nonce = randomBytes(PIN_NONCE_BYTES);
+    const ciphertext = await aesGcmEncrypt(pinKey, nonce, seed, PIN_SEED_AAD);
+    return {
+      pin_salt_b64: toB64(pinSalt),
+      wrapped_b64: encodeKdfWrapped(nonce, ciphertext),
+    };
+  } finally {
+    zero(pinKey);
+  }
+};
+
+/** Throws on a wrong PIN (auth tag) or a blob that isn't a seed blob. */
+export const unwrapSeedWithPin = async (
+  blob: TPinWrappedSeed,
+  pin: string,
+): Promise<Uint8Array> => {
+  const pinSalt = fromB64(blob.pin_salt_b64);
+  const decoded = decodeKdfWrapped(blob.wrapped_b64, "pin seed blob");
+  const version = requireKdfVersion(decoded.version);
+  const pinKey = await deriveWrapKey(normalizePin(pin), pinSalt, version);
+  try {
+    const seed = await aesGcmDecrypt(
+      pinKey,
+      decoded.nonce,
+      decoded.ciphertext,
+      PIN_SEED_AAD,
+    );
+    if (seed.length !== SEED_BYTES) {
+      zero(seed);
+      throw new Error("pin seed blob did not contain a vault seed");
+    }
+    return seed;
+  } finally {
+    zero(pinKey);
+  }
+};

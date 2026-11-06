@@ -151,3 +151,48 @@ export const mintApiKey = async (
     wrapKey.fill(0);
   }
 };
+
+/** The secret columns of an `api_keys` row re-wrapped under a new DEK. */
+export type TRewrappedApiKey = {
+  readonly dek_for_key: string;
+  readonly secret_ciphertext: string;
+  readonly secret_nonce: string;
+};
+
+/**
+ * Re-wrap an existing API key for a new DEK (the seed-only vault's one-time
+ * migration, docs/plans/seed-only-vault.md). The browser opens the key's
+ * `secret_ciphertext` with the OLD DEK to get the `sk-llm` token, then calls
+ * this with the NEW DEK: the token itself is unchanged, so every daemon and
+ * client holding it keeps working. Never zeroes its inputs.
+ */
+export const rewrapApiKey = async (
+  skLlm: string,
+  newDek: Uint8Array,
+): Promise<TRewrappedApiKey> => {
+  if (newDek.length !== DEK_BYTES) throw new Error("DEK must be 32 bytes");
+  const parsed = parseApiKey(skLlm);
+  if (parsed === null) throw new Error("not an OpenLLM API key");
+  const wrapKey = await deriveApiWrapKey(parsed.secret, parsed.id);
+  try {
+    const nonce = randomBytes(NONCE_BYTES);
+    const dekForKey = joinSealed(
+      nonce,
+      await aesGcmEncrypt(wrapKey, nonce, newDek),
+    );
+    const secretNonce = randomBytes(NONCE_BYTES);
+    const secretCt = await aesGcmEncrypt(
+      newDek,
+      secretNonce,
+      new TextEncoder().encode(skLlm),
+    );
+    return {
+      dek_for_key: toB64(dekForKey),
+      secret_ciphertext: toB64(secretCt),
+      secret_nonce: toB64(secretNonce),
+    };
+  } finally {
+    wrapKey.fill(0);
+    parsed.secret.fill(0);
+  }
+};

@@ -60,16 +60,26 @@ export const deriveDeviceControlSeed = async (
 ): Promise<Uint8Array> => {
   const entropy = mnemonicToEntropy(normalizePhrase(phrase), wordlist);
   try {
-    return await hkdfSha256(
-      entropy,
-      new TextEncoder().encode(DEVICE_CONTROL_HKDF_SALT),
-      DEVICE_CONTROL_HKDF_INFO,
-      SEED_BYTES,
-    );
+    return await deriveDeviceControlSeedFromVaultSeed(entropy);
   } finally {
     zero(entropy);
   }
 };
+
+/**
+ * {@link deriveDeviceControlSeed} from the vault seed itself (the phrase's
+ * BIP39 entropy, `./seed.ts`) — the same key, for callers that hold the seed
+ * bytes rather than the words. Never zeroes its input.
+ */
+export const deriveDeviceControlSeedFromVaultSeed = (
+  vaultSeed: Uint8Array,
+): Promise<Uint8Array> =>
+  hkdfSha256(
+    vaultSeed,
+    new TextEncoder().encode(DEVICE_CONTROL_HKDF_SALT),
+    DEVICE_CONTROL_HKDF_INFO,
+    SEED_BYTES,
+  );
 
 /** The control public key as base64(SPKI DER) — the value daemons pin. */
 export const deviceControlPublicKeySpkiB64 = (
