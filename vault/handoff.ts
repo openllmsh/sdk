@@ -278,9 +278,13 @@ export const openHandoff = async (
   }
   try {
     const parsed: unknown = JSON.parse(new TextDecoder().decode(plaintext));
+    if (isRecord(parsed) && parsed.v !== PAYLOAD_VERSION) {
+      throw new Error(
+        "handoff payload version is outdated: reload the approving tab",
+      );
+    }
     if (
       !isRecord(parsed) ||
-      parsed.v !== PAYLOAD_VERSION ||
       parsed.user_id !== binding.userId ||
       parsed.request_id !== binding.requestId ||
       parsed.vault_version !== binding.vaultVersion ||
