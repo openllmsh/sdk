@@ -33,6 +33,11 @@ export type TClassifierInput = {
 
 const QUOTA_BODY =
   /usage limit|usage balance|balance exhausted|quota|billing cycle|upgrade your plan|out of credits|purchase extra usage|insufficient_quota/i;
+
+/** True when an error body says the account is out of quota (the same
+ *  phrasing that upgrades a 401/402/403/429 to `quota_exhausted`). */
+export const isQuotaExhaustedText = (text: string): boolean =>
+  QUOTA_BODY.test(text);
 /**
  * The vendor error phrasings that mean "request too large for this model's
  * context window". Exported so callers that classify a raw upstream body — e.g.
