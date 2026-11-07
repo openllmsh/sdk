@@ -16,25 +16,68 @@ vault/
   crypto.ts    — WebCrypto AES-256-GCM + HKDF-SHA256 + b64/b64url + zero()
   argon2.ts    — Argon2id wrap-key derivation, params registry keyed by version
   wrapped.ts   — sealed-blob layout: IV||ct, plus the `v<n>:` KDF stamp
-  derive.ts    — buildVault / unlockDek (phrase → DEK via wrapped_dek)
+  seed.ts      — THE vault secret: seed ↔ phrase, seed → DEK / vault_key_id
+                 (HKDF), key-tree branch/leaf keys, passkey seed seal
+  vault-item.ts— seal/open an item under its branch (and leaf) of the tree;
+                 `k1:` nonce tag, untagged = legacy root (until the sunset)
+  vault-migrate-digest.ts — row digest shared by browser and server for the
+                 one-time update and rotation
+  derive.ts    — LEGACY: buildVault / unlockDek (phrase → DEK via wrapped_dek)
   credential.ts— encrypt/decrypt a credential row under the DEK
   api-key.ts   — sk-llm parse + HKDF api-wrap-key + dek_for_key un/wrap + mint
   device-access.ts — Ed25519 SPKI encoding + device-grant sign / verify
   device-control.ts— the account device-control key (phrase → Ed25519, never
                  from the DEK), rotation sign/verify, control-keep outer key
   daemon-attest.ts — control-signed attestation of a daemon X25519 key (dpk)
-  handoff.ts   — device handoff: X25519 seal of the DEK (+ phrase) to a new
-                 device, its binding, the phrase check, the 6-digit code
+  handoff.ts   — device handoff: X25519 seal of the SEED to a new device, its
+                 binding, the anchor check (`vault_key_id`), the 6-digit code
   cli-auth-seal.ts — seal an ordinary sk-llm API key to a CLI caller's ephemeral
                  X25519 pubkey (CLI OpenLLM OAuth handover; distinct domain/AAD
                  from the connector seal so ciphertexts are not interchangeable)
-  passkey.ts   — WebAuthn-PRF DEK wrap (HKDF, AAD-bound to credential + generation)
+  passkey.ts   — LEGACY WebAuthn-PRF DEK wrap (seed vaults seal the seed: seed.ts)
   phrase.ts · pin.ts (deriveVaultState lives in lib/vault/state.ts)
   team.ts    — user-held team key T: seal under DEK, invite wrap, K_mem, memory seal
   index.ts
 ```
 
-## Zero-knowledge vault
+## Seed-only vault (current)
+
+Design and decisions: [`docs/plans/seed-only-vault.md`](../../docs/plans/seed-only-vault.md).
+The sections after this one describe the LEGACY vault, which stays readable
+only until the sunset (`docs/todo/remove-legacy-vault-migration.md`).
+
+- **One secret.** The seed is the 12-word phrase's 16-byte BIP39 entropy
+  (`seed.ts`). Everything is derived from it with HKDF, nothing derived is
+  stored: the vault root key (DEK), the public `users.vault_key_id` (the
+  server's check that a phrase or a handed-off seed is this vault's), and the
+  device-control key (`device-control.ts`, unchanged from legacy for the same
+  phrase).
+- **Stored only sealed, only under a method.** A PIN (`seed_pin_v1:`, Argon2id,
+  this browser) or a passkey (`user_passkeys.sealed_seed`, PRF output → HKDF,
+  AAD-bound to the credential and `vault_key_id`, plus a local cache
+  `seed_passkey_v1:`). `session.openSeed(seed, method)` is the only way in and
+  requires a method; the unlocked session is `session_v4:` under a
+  non-extractable IndexedDB key. The phrase is shown again by opening the seed
+  with the PIN or passkey (Settings → Vault, `/get-started`), never from a
+  stored copy.
+- **Key tree.** Items are sealed under a branch of the root (`credentials`,
+  `memory/<integration>`, `chats/<session id>`, `apps`, `teams`, `keys`) with a
+  `k1:` nonce tag (`vault-item.ts`). Every API key's `dek_for_key` wraps the
+  whole root, so by default every key reads what any other wrote; narrowing
+  is opt-in and never changes leaf ids.
+- **One-time update / rotation** (`/api/vault/migrate/*`,
+  `lib/vault/migrate.ts`). A legacy vault is re-sealed once from its random
+  root to the seed's root (seed = the phrase the user already has) on a
+  blocking screen; a seed vault rotates the same way to a NEW seed. Rows are
+  paged, re-sealed, verified and staged with the digest of the row they
+  replace; the commit swaps all of them in one transaction or refuses
+  (`migration_incomplete`). API keys keep their strings (re-wrapped, not
+  revoked). The control key is re-published at the new version with its
+  device attestations re-signed (rotation also signs `old → new`).
+- **Handoff** carries the seed; the new device checks it against
+  `vault_key_id`, then chooses a PIN or passkey before `openSeed`.
+
+## Zero-knowledge vault (legacy)
 
 Provider credentials are never persisted in plaintext or sent plaintext
 when saved from the browser. The proxy receives plaintext only after it
@@ -124,7 +167,7 @@ key_id || dpk)` — checked before any `dpk` is trusted), and
 `signDeviceSessionsDisable` (the control-signed remote DISABLE only —
 re-enable writes the anchor again via install / update / login / desktop).
 
-## Vault state machine
+## Vault state machine (legacy)
 
 `vault_state` (derived by `deriveVaultState` in `lib/vault/state.ts`) is one of
 `uninitialized → pending_phrase → ready`, plus `reset_pending`. The
@@ -199,7 +242,7 @@ CLI unwraps on claim with its private key; claim retries return the same
 envelope until the original authorization expiry. No OAuth access/refresh
 tokens are sealed or retained — only the ordinary user-owned API key.
 
-## Device handoff
+## Device handoff (legacy payload)
 
 A device with no PIN blob (the desktop app, another browser) can get the vault
 from one of the account's unlocked devices instead of the recovery phrase
@@ -217,7 +260,7 @@ refused, so only devices that keep the phrase are asked to approve. The server
 (`/api/vault/handoff/*`, browser-session only) stores public keys, a token
 hash and ciphertext — nothing that opens.
 
-## Passkey wraps (WebAuthn PRF)
+## Passkey wraps (WebAuthn PRF) (legacy DEK wrap)
 
 The third DEK wrapper, beside the phrase and the PIN
 (`docs/plans/passkey-vault-unlock.md`):
