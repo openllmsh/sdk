@@ -228,6 +228,12 @@ export const AgentAttachCommand = S.Struct({
   session_id: AgentSessionId,
   /** Engine of the target session when the consumer knows it (local index). */
   engine: S.optional(AgentEngine),
+  /**
+   * The session was started with skip-permissions: a resume (the session is
+   * not running) relaunches the engine the same way. Ignored when joining a
+   * live session, which keeps the mode it runs in.
+   */
+  skip_permissions: S.optional(S.Boolean),
 });
 export type TAgentAttachCommand = S.Schema.Type<typeof AgentAttachCommand>;
 
