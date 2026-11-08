@@ -65991,6 +65991,55 @@
                       }
                     ]
                   },
+                  "new_passkey": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 11,
+                            "maxLength": 1366
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "prf_salt": {
+                            "type": "string"
+                          },
+                          "sealed_seed": {
+                            "type": "string"
+                          },
+                          "transports": {
+                            "anyOf": [
+                              {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 32
+                                },
+                                "maxItems": 8
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "prf_salt",
+                          "sealed_seed"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "passkey": {
                     "anyOf": [
                       {
