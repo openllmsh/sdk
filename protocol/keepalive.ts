@@ -15,15 +15,16 @@
 export const KEEPALIVE_REQUEST_HEADER = "x-openllm-keepalive";
 /** Set on a response that switched to the envelope. */
 export const KEEPALIVE_RESPONSE_HEADER = "x-openllm-keepalive";
-/** Well inside the edge's ~100 s; every pre-dispatch refusal answers sooner. */
-export const KEEPALIVE_FIRST_BYTE_MS = 60_000;
+/** Far inside the edge's ~100 s, whose clock also counts the upload and a
+ *  cold start; every pre-dispatch refusal answers sooner. */
+export const KEEPALIVE_FIRST_BYTE_MS = 30_000;
 export const KEEPALIVE_INTERVAL_MS = 20_000;
 
 export type TKeepaliveEnvelope = {
   readonly openllm_keepalive: 1;
   /** The status the response would have had. */
   readonly status: number;
-  /** Its `x-openllm-*` headers (attribution, media urls). */
+  /** Its `content-type` and `x-openllm-*` headers (attribution, media urls). */
   readonly headers: Readonly<Record<string, string>>;
   /** Its body: parsed JSON when it was JSON, otherwise the text. */
   readonly body: unknown;
