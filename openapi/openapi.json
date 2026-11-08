@@ -65981,6 +65981,16 @@
                   "vault_key_id": {
                     "type": "string"
                   },
+                  "wipe": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "passkey": {
                     "anyOf": [
                       {
