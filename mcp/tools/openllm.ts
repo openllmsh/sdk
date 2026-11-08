@@ -786,3 +786,52 @@ export const handleOpenllmTool = async (
     return textResult(`Error: ${msg}`, true);
   }
 };
+
+/** A transcription answers with one whole body, after the provider has
+ *  processed every second of audio (whisper-1 took ~16 s per minute) and
+ *  the upload has crossed the caller's uplink. Wait as long as the gateway
+ *  function may run (`maxDuration = 300`), not the generic tool ceiling. */
+export const TRANSCRIPTION_TIMEOUT_MS = 300_000;
+
+/**
+ * Uploads audio to `/v1/audio/transcriptions` as multipart — the raw bytes,
+ * not a base64 data URL in JSON (a third larger, fully buffered on both
+ * ends). The result reads like {@link handleOpenllmTool}'s: the body plus
+ * the attribution of the model that served (or refused) it.
+ */
+export const uploadTranscription = async (
+  form: FormData,
+  config: { baseUrl: string; apiKey: string },
+): Promise<TToolResult> => {
+  const client = createClient({
+    origin: config.baseUrl,
+    apiKey: config.apiKey,
+    transport: {
+      fetch: globalThis.fetch.bind(globalThis),
+      websocket: WebSocket,
+    },
+  });
+  try {
+    const res = await client.http.request("/v1/audio/transcriptions", {
+      method: "POST",
+      body: form,
+      signal: AbortSignal.timeout(TRANSCRIPTION_TIMEOUT_MS),
+    });
+    if (!res.ok) return await responseErrorResult(res);
+    const raw = await res.text();
+    let text = raw;
+    if ((res.headers.get("content-type") ?? "").includes("application/json")) {
+      try {
+        text = JSON.stringify(JSON.parse(raw), null, 2);
+      } catch {
+        text = raw;
+      }
+    }
+    return textResult(withAttribution(text, res.headers));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return textResult(`Error: ${msg}`, true);
+  } finally {
+    client.close();
+  }
+};
