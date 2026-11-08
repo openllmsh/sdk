@@ -16,9 +16,11 @@ import type { TApiOperation } from "@openllmsh/sdk/openapi";
 import { API_OPERATIONS } from "@openllmsh/sdk/openapi";
 import generatedSpec from "@openllmsh/sdk/openapi/spec.json";
 import {
+  KEEPALIVE_REQUEST_HEADER,
   OAUTH_PROVIDER_SLUGS,
   OPENLLM_CHAIN_HEADER,
   OPENLLM_RESOLVED_MODEL_HEADER,
+  unwrapKeepaliveResponse,
 } from "@openllmsh/sdk/protocol";
 import type { TToolResult } from "../types";
 import { MODELS_TOOL_NAME } from "./model-priority";
@@ -784,5 +786,59 @@ export const handleOpenllmTool = async (
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return textResult(`Error: ${msg}`, true);
+  }
+};
+
+/** A transcription answers with one whole body, after the provider has
+ *  processed every second of audio (whisper-1 took ~16 s per minute) and
+ *  the upload has crossed the caller's uplink. Wait as long as the gateway
+ *  function may run (`maxDuration = 300`), not the generic tool ceiling. */
+export const TRANSCRIPTION_TIMEOUT_MS = 300_000;
+
+/**
+ * Uploads audio to `/v1/audio/transcriptions` as multipart — the raw bytes,
+ * not a base64 data URL in JSON (a third larger, fully buffered on both
+ * ends). The result reads like {@link handleOpenllmTool}'s: the body plus
+ * the attribution of the model that served (or refused) it.
+ */
+export const uploadTranscription = async (
+  form: FormData,
+  config: { baseUrl: string; apiKey: string },
+): Promise<TToolResult> => {
+  const client = createClient({
+    origin: config.baseUrl,
+    apiKey: config.apiKey,
+    transport: {
+      fetch: globalThis.fetch.bind(globalThis),
+      websocket: WebSocket,
+    },
+  });
+  try {
+    // Opt in to heartbeat bytes so a long recording survives the edge
+    // proxy's ~100 s silence limit; the envelope unwraps to the real answer.
+    const res = await unwrapKeepaliveResponse(
+      await client.http.request("/v1/audio/transcriptions", {
+        method: "POST",
+        headers: { [KEEPALIVE_REQUEST_HEADER]: "1" },
+        body: form,
+        signal: AbortSignal.timeout(TRANSCRIPTION_TIMEOUT_MS),
+      }),
+    );
+    if (!res.ok) return await responseErrorResult(res);
+    const raw = await res.text();
+    let text = raw;
+    if ((res.headers.get("content-type") ?? "").includes("application/json")) {
+      try {
+        text = JSON.stringify(JSON.parse(raw), null, 2);
+      } catch {
+        text = raw;
+      }
+    }
+    return textResult(withAttribution(text, res.headers));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return textResult(`Error: ${msg}`, true);
+  } finally {
+    client.close();
   }
 };

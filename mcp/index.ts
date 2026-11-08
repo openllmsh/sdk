@@ -13,8 +13,10 @@ export {
   openllmToolDefs,
   openllmToolDefsAll,
   prioritizeSubscriptionModels,
+  TRANSCRIPTION_TIMEOUT_MS,
   TRANSCRIPTION_TOOL_NAME,
   toolNameFor,
+  uploadTranscription,
 } from "./handle";
 export type {
   TBeginMarketplaceLoadOptions,

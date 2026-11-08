@@ -23,6 +23,7 @@ export * from "./hop-grant";
 export * from "./image-edit-parse";
 export * from "./images";
 export * from "./inference-headers";
+export * from "./keepalive";
 export * from "./local-auth";
 export * from "./local-device-control";
 export * from "./local-provider";

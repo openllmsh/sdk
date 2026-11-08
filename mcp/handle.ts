@@ -16,6 +16,8 @@ export {
   MAX_TRANSCRIPTION_BYTES,
   openllmToolDefs,
   openllmToolDefsAll,
+  TRANSCRIPTION_TIMEOUT_MS,
   TRANSCRIPTION_TOOL_NAME,
   toolNameFor,
+  uploadTranscription,
 } from "./tools/openllm";
