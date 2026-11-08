@@ -16,9 +16,11 @@ import type { TApiOperation } from "@openllmsh/sdk/openapi";
 import { API_OPERATIONS } from "@openllmsh/sdk/openapi";
 import generatedSpec from "@openllmsh/sdk/openapi/spec.json";
 import {
+  KEEPALIVE_REQUEST_HEADER,
   OAUTH_PROVIDER_SLUGS,
   OPENLLM_CHAIN_HEADER,
   OPENLLM_RESOLVED_MODEL_HEADER,
+  unwrapKeepaliveResponse,
 } from "@openllmsh/sdk/protocol";
 import type { TToolResult } from "../types";
 import { MODELS_TOOL_NAME } from "./model-priority";
@@ -812,11 +814,16 @@ export const uploadTranscription = async (
     },
   });
   try {
-    const res = await client.http.request("/v1/audio/transcriptions", {
-      method: "POST",
-      body: form,
-      signal: AbortSignal.timeout(TRANSCRIPTION_TIMEOUT_MS),
-    });
+    // Opt in to heartbeat bytes so a long recording survives the edge
+    // proxy's ~100 s silence limit; the envelope unwraps to the real answer.
+    const res = await unwrapKeepaliveResponse(
+      await client.http.request("/v1/audio/transcriptions", {
+        method: "POST",
+        headers: { [KEEPALIVE_REQUEST_HEADER]: "1" },
+        body: form,
+        signal: AbortSignal.timeout(TRANSCRIPTION_TIMEOUT_MS),
+      }),
+    );
     if (!res.ok) return await responseErrorResult(res);
     const raw = await res.text();
     let text = raw;
