@@ -326,7 +326,7 @@ export const openllmToolDefs = AGENT_OPERATIONS.filter(isMcpExposed).map(
     if (def.name !== TRANSCRIPTION_TOOL_NAME) return def;
     return {
       ...def,
-      description: `${def.description} Transcribe a local audio file by path; never send audio bytes or base64. Relative paths resolve from the MCP server working directory. Input and converted audio are limited to 25 MiB. Accepts WAV, MP3, WebM, M4A/MP4, Ogg/Opus and FLAC. With model omitted, models are tried in catalog order and the audio is converted (system ffmpeg on PATH) to whatever each model accepts, so the format never changes which model is used.`,
+      description: `${def.description} Transcribe a local audio file by path; never send audio bytes or base64. Relative paths resolve from the MCP server working directory. Input and converted audio are limited to 25 MiB. Accepts any common audio or video file as it is (WAV, MP3, M4A/MP4/MOV, AAC, CAF, AIFF, FLAC, Ogg/Opus, WebM/MKV, WMA, AMR and more); never convert it yourself. With model omitted, models are tried in catalog order and the audio is converted (system ffmpeg on PATH) to whatever each model accepts, so the format never changes which model is used.`,
       inputSchema: {
         type: "object",
         properties: {
@@ -795,6 +795,10 @@ export const handleOpenllmTool = async (
  *  function may run (`maxDuration = 300`), not the generic tool ceiling. */
 export const TRANSCRIPTION_TIMEOUT_MS = 300_000;
 
+/** The local daemon has no function time limit, and a subscription STT
+ *  (Grok) takes longer than real time: 5 minutes of audio took ~380 s. */
+export const LOCAL_TRANSCRIPTION_TIMEOUT_MS = 900_000;
+
 /**
  * Uploads audio to `/v1/audio/transcriptions` as multipart — the raw bytes,
  * not a base64 data URL in JSON (a third larger, fully buffered on both
@@ -804,12 +808,18 @@ export const TRANSCRIPTION_TIMEOUT_MS = 300_000;
 export const uploadTranscription = async (
   form: FormData,
   config: { baseUrl: string; apiKey: string },
+  timeoutMs: number = TRANSCRIPTION_TIMEOUT_MS,
 ): Promise<TToolResult> => {
   const client = createClient({
     origin: config.baseUrl,
     apiKey: config.apiKey,
     transport: {
-      fetch: globalThis.fetch.bind(globalThis),
+      // Bun's fetch gives up after ~360 s without response headers, and a
+      // local daemon answers only once the provider is done (Grok took
+      // ~380 s for 5 minutes of audio). `timeout: false` lifts that; the
+      // signal below still bounds the call. Other runtimes ignore the key.
+      fetch: (input, init) =>
+        globalThis.fetch(input, { ...init, timeout: false } as RequestInit),
       websocket: WebSocket,
     },
   });
@@ -821,7 +831,7 @@ export const uploadTranscription = async (
         method: "POST",
         headers: { [KEEPALIVE_REQUEST_HEADER]: "1" },
         body: form,
-        signal: AbortSignal.timeout(TRANSCRIPTION_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       }),
     );
     if (!res.ok) return await responseErrorResult(res);
