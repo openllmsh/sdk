@@ -11181,7 +11181,14 @@
                 "type": "object",
                 "properties": {
                   "model": {
-                    "type": "string"
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "input": {
                     "anyOf": [
@@ -11279,7 +11286,6 @@
                   }
                 },
                 "required": [
-                  "model",
                   "input"
                 ],
                 "additionalProperties": false
