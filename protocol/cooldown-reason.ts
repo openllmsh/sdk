@@ -11,6 +11,8 @@ export const CooldownReason = S.Literals([
   "not_found",
   "payload_too_large",
   "unprocessable",
+  "request_invalid",
+  "accepted_unreadable",
   "context_overflow",
   "content_filter",
   "upstream_rejection",
@@ -32,12 +34,13 @@ export type THopAction =
  *   reason cools is exactly `action === "cool_and_advance"`, and `ttlMs` lives
  *   only on this variant.
  * - `walk_no_cool` — the model is unavailable for this request but another might
- *   serve it (model absent / policy refusal); hop without cooling.
- * - `surface` — the MODEL is fine; the REQUEST is malformed/oversized, so every
- *   model would reject it identically. Surface the authentic error on this model
- *   (no hop, no cool, no retry) — hopping would only cold-miss the next model's
- *   cache and re-bill, and the client's corrected retry lands warm on the same
- *   model.
+ *   serve it (model absent / policy refusal / capability miss / oversized for
+ *   THIS model); hop without cooling.
+ * - `surface` — the REQUEST itself is malformed (`request_invalid`) or
+ *   unprocessable in a request-deterministic way, so every model would reject
+ *   it identically. Surface the authentic error on this model (no hop, no cool,
+ *   no retry) — hopping would only cold-miss the next model's cache and re-bill,
+ *   and the client's corrected retry lands warm on the same model.
  */
 export type TCooldownPolicy =
   | { readonly action: "retry_in_place" | "walk_no_cool" | "surface" }
@@ -54,10 +57,17 @@ const cooldownPolicies = {
   // Model unavailable for this request, but a sibling may serve it — hop, no cool.
   not_found: { action: "walk_no_cool" },
   content_filter: { action: "walk_no_cool" },
+  // Oversized for THIS model; a larger-context sibling may still accept it.
+  payload_too_large: { action: "walk_no_cool" },
+  // Capability / unfamiliar 4xx: hop-local — another model may accept the same
+  // canonical request. Walk without cooling.
+  upstream_rejection: { action: "walk_no_cool" },
   // Request-deterministic: the model works, the request is bad — surface, no hop.
-  payload_too_large: { action: "surface" },
   unprocessable: { action: "surface" },
-  upstream_rejection: { action: "surface" },
+  request_invalid: { action: "surface" },
+  // The provider answered with a non-error status we couldn't use: it accepted
+  // (and may have billed) the request, so another hop would bill it twice.
+  accepted_unreadable: { action: "surface" },
   // Context overflow is intercepted before the action switch, so this is inert.
   context_overflow: { action: "walk_no_cool" },
 } satisfies Record<TCooldownReason, TCooldownPolicy>;

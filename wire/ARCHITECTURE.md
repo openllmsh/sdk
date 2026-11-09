@@ -57,6 +57,7 @@ wire/
       strip-tool-calls,upstream-error}.ts SSE framing/liveness, generic provider decode,
                                         canonical chunk conversion/collection, peeking, and errors
     {encrypted-content,error-class,
+      error-envelope,provider-error-rules,
       forwarded-headers,refusal,
       thinking-signature,tool-schema}.ts request/error/header and provider-compatibility helpers
 ```
