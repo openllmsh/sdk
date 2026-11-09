@@ -44,10 +44,13 @@ export type TClassifierInput = {
 };
 
 const QUOTA_BODY =
-  /usage limit|usage balance|balance exhausted|quota|billing cycle|upgrade your plan|out of credits|purchase extra usage|insufficient_quota|insufficient (?:credits?|balance|funds)|credit balance|payment required|top[\s-]?up/i;
+  /usage limit|usage balance|balance exhausted|quota|billing cycle|upgrade your plan|out of credits|purchase extra usage|insufficient_quota|insufficient (?:credits?|balance|funds)|credit balance|payment required|top[\s-]?up (?:your )?(?:credits?|balance|account)/i;
 
+/** Request-shape failures that every model would reject identically.
+ *  Capability / model-local refusals ("Unsupported parameter: …",
+ *  "Unknown parameter: …") stay out — those walk as `upstream_rejection`. */
 const REQUEST_INVALID_BODY =
-  /missing required parameter|could not parse the json|invalid json body|extra inputs are not permitted|unsupported parameter|unknown parameter/i;
+  /missing required parameter|could not parse the json|invalid json body|extra inputs are not permitted/i;
 
 /** True when an error body says the account is out of quota (the same
  *  phrasing that upgrades a 401/402/403/429 to `quota_exhausted`). */
@@ -81,12 +84,13 @@ export const reasonFor = (
   rules: readonly TProviderErrorRule[] = errorRulesFor(i.provider),
 ): TCooldownReason => {
   if (i.envelope?.error?.code === "content_filter") return "content_filter";
-  // A non-error status the runner still couldn't use (an undecodable 200):
-  // the provider ACCEPTED the request and may have billed it, so walking on
-  // would send — and bill — it again. Only an explicit in-band refusal
-  // (content_filter, above) walks from a 2xx; no body matcher or provider rule
-  // may turn an accepted request into a walk.
-  if (i.status >= 100 && i.status < 400) return "accepted_unreadable";
+  // A 2xx the runner still couldn't use (an undecodable 200): the provider
+  // ACCEPTED the request and may have billed it, so walking on would send —
+  // and bill — it again. Only an explicit in-band refusal (content_filter,
+  // above) walks from a 2xx; no body matcher or provider rule may turn an
+  // accepted request into a walk. 3xx falls through to the normal rules
+  // (typically `upstream_rejection` → walk).
+  if (i.status >= 200 && i.status < 300) return "accepted_unreadable";
   const message = i.envelope?.error?.message ?? "";
   if (CONTEXT_OVERFLOW_BODY.test(message)) return "context_overflow";
 

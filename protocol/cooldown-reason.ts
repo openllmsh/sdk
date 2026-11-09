@@ -36,11 +36,13 @@ export type THopAction =
  * - `walk_no_cool` — the model is unavailable for this request but another might
  *   serve it (model absent / policy refusal / capability miss / oversized for
  *   THIS model); hop without cooling.
- * - `surface` — the REQUEST itself is malformed (`request_invalid`) or
- *   unprocessable in a request-deterministic way, so every model would reject
- *   it identically. Surface the authentic error on this model (no hop, no cool,
- *   no retry) — hopping would only cold-miss the next model's cache and re-bill,
- *   and the client's corrected retry lands warm on the same model.
+ * - `surface` — stop on this hop (no hop, no cool, no retry). Covers
+ *   request-deterministic failures (`request_invalid`, `unprocessable`) where
+ *   every model would reject the request identically, and
+ *   `accepted_unreadable` where the provider already accepted a 2xx the runner
+ *   could not use (it may have billed — never re-send). On the cloud's ordered
+ *   cloud↔device segment walk a `surface` reason ends the whole request, not
+ *   only the current segment.
  */
 export type TCooldownPolicy =
   | { readonly action: "retry_in_place" | "walk_no_cool" | "surface" }
