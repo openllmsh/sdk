@@ -13,6 +13,7 @@ export const MediaDefaultSurface = S.Literals([
   "transcription",
   "speech",
   "video",
+  "embeddings",
 ]);
 export type TMediaDefaultSurface = S.Schema.Type<typeof MediaDefaultSurface>;
 

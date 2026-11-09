@@ -34,6 +34,7 @@ export * from "./media-bytes";
 export * from "./media-default";
 export * from "./media-dimensions";
 export * from "./media-input";
+export * from "./media-model";
 export * from "./media-option-issue";
 export * from "./media-types";
 export * from "./model-match";
