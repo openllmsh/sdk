@@ -27557,7 +27557,7 @@
                         "type": "string"
                       }
                     },
-                    "at_capacity": {
+                    "not_open": {
                       "type": "boolean"
                     },
                     "logo_url": {
@@ -27579,7 +27579,7 @@
                     "default_policy",
                     "verified",
                     "redirect_hosts",
-                    "at_capacity",
+                    "not_open",
                     "logo_url"
                   ],
                   "additionalProperties": false
@@ -32564,24 +32564,6 @@
                               }
                             ]
                           },
-                          "connection_limit": {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "enum": [
-                                  "Infinity",
-                                  "-Infinity",
-                                  "NaN"
-                                ]
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
                           "logo_url": {
                             "anyOf": [
                               {
@@ -32717,7 +32699,6 @@
                           "verified",
                           "disabled",
                           "connections",
-                          "connection_limit",
                           "logo_url",
                           "logo_source",
                           "review",
@@ -33275,24 +33256,6 @@
                             }
                           ]
                         },
-                        "connection_limit": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "string",
-                              "enum": [
-                                "Infinity",
-                                "-Infinity",
-                                "NaN"
-                              ]
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
                         "logo_url": {
                           "anyOf": [
                             {
@@ -33428,7 +33391,6 @@
                         "verified",
                         "disabled",
                         "connections",
-                        "connection_limit",
                         "logo_url",
                         "logo_source",
                         "review",
@@ -33925,66 +33887,17 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "name": {
+                  "application_id": {
                     "type": "string",
-                    "maxLength": 64
-                  },
-                  "homepage_url": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "maxLength": 2048
-                      },
-                      {
-                        "type": "null"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "redirect_uris": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "maxLength": 2048
-                    },
-                    "minItems": 1,
-                    "maxItems": 5
+                    "minLength": 1,
+                    "maxLength": 512
                   },
                   "x25519_public": {
                     "type": "string"
-                  },
-                  "logo_url": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "maxLength": 2048
-                      },
-                      {
-                        "type": "null"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "application_id": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 512
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
                   }
                 },
                 "required": [
-                  "name",
-                  "redirect_uris",
+                  "application_id",
                   "x25519_public"
                 ],
                 "additionalProperties": false
@@ -34070,24 +33983,6 @@
                             "-Infinity",
                             "NaN"
                           ]
-                        }
-                      ]
-                    },
-                    "connection_limit": {
-                      "anyOf": [
-                        {
-                          "type": "number"
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "Infinity",
-                            "-Infinity",
-                            "NaN"
-                          ]
-                        },
-                        {
-                          "type": "null"
                         }
                       ]
                     },
@@ -34226,7 +34121,6 @@
                     "verified",
                     "disabled",
                     "connections",
-                    "connection_limit",
                     "logo_url",
                     "logo_source",
                     "review",
@@ -35794,24 +35688,6 @@
                         }
                       ]
                     },
-                    "connection_limit": {
-                      "anyOf": [
-                        {
-                          "type": "number"
-                        },
-                        {
-                          "type": "string",
-                          "enum": [
-                            "Infinity",
-                            "-Infinity",
-                            "NaN"
-                          ]
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
                     "logo_url": {
                       "anyOf": [
                         {
@@ -35947,7 +35823,6 @@
                     "verified",
                     "disabled",
                     "connections",
-                    "connection_limit",
                     "logo_url",
                     "logo_source",
                     "review",
@@ -36470,6 +36345,17 @@
                       "minLength": 1,
                       "maxLength": 512
                     },
+                    "stage": {
+                      "type": "string",
+                      "enum": [
+                        "under_review",
+                        "declined",
+                        "ready_to_set_up",
+                        "live",
+                        "change_under_review",
+                        "change_declined"
+                      ]
+                    },
                     "name": {
                       "type": "string",
                       "minLength": 1,
@@ -36551,6 +36437,7 @@
                   },
                   "required": [
                     "id",
+                    "stage",
                     "name",
                     "homepage_url",
                     "redirect_uris",
@@ -37049,6 +36936,17 @@
                             "minLength": 1,
                             "maxLength": 512
                           },
+                          "stage": {
+                            "type": "string",
+                            "enum": [
+                              "under_review",
+                              "declined",
+                              "ready_to_set_up",
+                              "live",
+                              "change_under_review",
+                              "change_declined"
+                            ]
+                          },
                           "name": {
                             "type": "string",
                             "minLength": 1,
@@ -37130,6 +37028,7 @@
                         },
                         "required": [
                           "id",
+                          "stage",
                           "name",
                           "homepage_url",
                           "redirect_uris",
