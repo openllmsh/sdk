@@ -213,9 +213,11 @@ export const connectRoutes = (
     status: async (req) => {
       const key = await params.userKey(req);
       if (key === null) return notSignedIn();
-      const user = await connect.user(key);
-      if (user === null) return Response.json({ connected: false });
       try {
+        // Inside the try: a storage failure or bad secret gets the sanitized,
+        // logged error answer like every other route.
+        const user = await connect.user(key);
+        if (user === null) return Response.json({ connected: false });
         const models = await user.models();
         return Response.json({
           connected: true,
