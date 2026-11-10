@@ -8,6 +8,28 @@
 
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import { fromJsonSchema, McpServer } from "@modelcontextprotocol/server";
+import type { TPermission } from "@openllmsh/sdk/protocol";
+import { Permission } from "@openllmsh/sdk/protocol";
+
+export type { TPermission };
+
+const KNOWN_PERMISSIONS: ReadonlySet<string> = new Set(Permission.literals);
+
+/**
+ * The `permissions` of an `/api/user/tier` answer, keeping only names this
+ * SDK knows; `undefined` when absent (an older gateway: list everything and
+ * let the gateway refuse what the key can't do).
+ */
+export const parseKeyPermissions = (
+  value: unknown,
+): readonly TPermission[] | undefined =>
+  Array.isArray(value)
+    ? value.filter(
+        (p): p is TPermission =>
+          typeof p === "string" && KNOWN_PERMISSIONS.has(p),
+      )
+    : undefined;
+
 import type {
   TMarketplaceLaunch,
   TMarketplaceLaunchServer,
@@ -62,6 +84,13 @@ export type TCreateMcpServerOptions = {
     args: Record<string, unknown>,
     config: TMcpGatewayConfig,
   ) => Promise<TToolResult>;
+  /**
+   * The calling key's permissions (`/api/user/tier`). When given, only tools
+   * the key may call are listed — a run-AI key is never offered account
+   * endpoints the gateway would refuse. Omit when unknown (fail open: the
+   * gateway still enforces every call).
+   */
+  readonly permissions?: readonly TPermission[];
 };
 
 /** One registration path for both negotiated stdio eras and local tests. */
@@ -72,8 +101,17 @@ export const createMcpServer = ({
   upstreams = [],
   includeFreeTierOnlyTools = false,
   transcribe,
+  permissions,
 }: TCreateMcpServerOptions): McpServer => {
+  const held =
+    permissions === undefined ? undefined : new Set<string>(permissions);
+  const mayCall = (name: string): boolean => {
+    if (held === undefined) return true;
+    const def = openllmToolDefs.find((tool) => tool.name === name);
+    return def !== undefined && held.has(def.permission);
+  };
   const openllmTools = openllmToolDefs.filter((tool) => {
+    if (!mayCall(tool.name)) return false;
     if (!includeFreeTierOnlyTools && isFreeTierOnlyTool(tool.name))
       return false;
     // Transcription needs a host-provided local-file handler.
@@ -114,6 +152,7 @@ export const createMcpServer = ({
         if (
           groups.includes("openllm") &&
           isMcpListedTool(name) &&
+          mayCall(name) &&
           (includeFreeTierOnlyTools || !isFreeTierOnlyTool(name))
         ) {
           if (name === TRANSCRIPTION_TOOL_NAME) {

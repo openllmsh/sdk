@@ -60,6 +60,13 @@ export const MarketplaceMcp = S.Struct({
    * refused on `tools/call` by the included-usage proxy.
    */
   blocked_tools: S.optional(S.Array(S.String)),
+  /**
+   * When set, the ONLY upstream tools users may reach. Prefer it for a vendor
+   * whose MCP mixes data tools with account tools: a tool the vendor adds
+   * later stays hidden until it is reviewed and listed here, which a
+   * blocklist can't do. `blocked_tools` still applies on top.
+   */
+  allowed_tools: S.optional(S.Array(S.String)),
 });
 export type TMarketplaceMcp = S.Schema.Type<typeof MarketplaceMcp>;
 
@@ -140,7 +147,24 @@ export const MarketplaceLaunchServer = S.Struct({
   env: S.optional(S.Record(S.String, S.String)),
   /** Carried from the entry's `mcp.blocked_tools`; the CLI drops these. */
   blocked_tools: S.optional(S.Array(S.String)),
+  /** Carried from the entry's `mcp.allowed_tools`; only these are kept. */
+  allowed_tools: S.optional(S.Array(S.String)),
 });
+
+/**
+ * Whether users may reach upstream tool `name` under an entry's lists: listed
+ * in `allowed_tools` (when there is one) and not in `blocked_tools`. The one
+ * rule the client filter and the included-usage proxy both apply.
+ */
+export const isUpstreamToolExposed = (
+  lists: {
+    readonly allowed_tools?: readonly string[] | undefined;
+    readonly blocked_tools?: readonly string[] | undefined;
+  },
+  name: string,
+): boolean =>
+  (lists.allowed_tools === undefined || lists.allowed_tools.includes(name)) &&
+  !(lists.blocked_tools ?? []).includes(name);
 export type TMarketplaceLaunchServer = S.Schema.Type<
   typeof MarketplaceLaunchServer
 >;

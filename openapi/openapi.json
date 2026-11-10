@@ -15981,6 +15981,42 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "permissions": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "team.invite",
+                              "team.delete",
+                              "team.role",
+                              "member.manage",
+                              "share.contribute",
+                              "inference.use",
+                              "media.read",
+                              "media.write",
+                              "sessions.read",
+                              "sessions.write",
+                              "mcp.use",
+                              "memory.read",
+                              "memory.write",
+                              "keys.manage",
+                              "credentials.manage",
+                              "config.manage",
+                              "stats.read",
+                              "marketplace.manage",
+                              "daemon.use",
+                              "billing.manage",
+                              "account.manage"
+                            ]
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "additionalProperties": false
@@ -49485,6 +49521,19 @@
                                     "type": "null"
                                   }
                                 ]
+                              },
+                              "allowed_tools": {
+                                "anyOf": [
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -51087,6 +51136,19 @@
                             ]
                           },
                           "blocked_tools": {
+                            "anyOf": [
+                              {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "allowed_tools": {
                             "anyOf": [
                               {
                                 "type": "array",

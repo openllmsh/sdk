@@ -25,6 +25,7 @@ export type {
   TLaunchConnected,
   TMarketplaceLoad,
   TMcpGatewayConfig,
+  TPermission,
 } from "./server";
 export {
   attachMarketplaceUpstreams,
@@ -33,6 +34,7 @@ export {
   filterLaunchServers,
   OPENLLM_MEMORY_BUILTIN_ID,
   OPENLLM_MEMORY_ENTRY_ID,
+  parseKeyPermissions,
 } from "./server";
 export type {
   TConnectUpstreamOptions,

@@ -14,9 +14,10 @@
 
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import { createClient } from "@openllmsh/sdk/client";
+import type { TMarketplaceLaunchServer } from "@openllmsh/sdk/protocol";
 import {
   isMarketplaceLaunchServer,
-  type TMarketplaceLaunchServer,
+  isUpstreamToolExposed,
 } from "@openllmsh/sdk/protocol";
 
 export type { TMarketplaceLaunchServer };
@@ -264,15 +265,16 @@ const handshakeUpstream = async (
       clientInfo: { name: "openllm", version: clientVersion },
     });
     await channel.notify("notifications/initialized");
-    const blocked = new Set(server.blocked_tools ?? []);
-    const tools = (await listTools(channel.rpc)).filter(
-      (tool) => !blocked.has(tool.name),
+    const exposed = (name: string): boolean =>
+      isUpstreamToolExposed(server, name);
+    const tools = (await listTools(channel.rpc)).filter((tool) =>
+      exposed(tool.name),
     );
     return {
       id: server.id,
       tools,
       call: async (name, args) => {
-        if (blocked.has(name))
+        if (!exposed(name))
           return errorResult(`${server.id}: ${name} is not available`);
         try {
           const result = await channel.rpc("tools/call", {
