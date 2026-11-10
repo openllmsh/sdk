@@ -11,6 +11,7 @@ import type {
 import {
   fetchAsConnection,
   finishConnect,
+  REFRESH_SKEW_MS,
   refreshConnection,
   startConnect,
 } from "./oauth";
@@ -82,20 +83,48 @@ export const createConnect = (params: CreateConnectParams): TConnect => {
   };
   const { store } = params;
 
+  // One refresh per user at a time: refresh tokens rotate on every use, and
+  // two refreshes with the same token revoke the user's whole token family.
+  // This serializes within one process; an app running several instances
+  // should also serialize per user (a row lock around `store.save`).
+  const refreshing = new Map<string, Promise<TConnection>>();
+  const refreshOnce = (
+    userKey: string,
+    current: TConnection,
+  ): Promise<TConnection> => {
+    const inflight = refreshing.get(userKey);
+    if (inflight) return inflight;
+    const run = (async (): Promise<TConnection> => {
+      // Another request may have refreshed and stored already.
+      const latest = (await store.load(userKey)) ?? current;
+      const next = await refreshConnection(config(), latest);
+      if (next !== latest) await store.save(userKey, next);
+      return next;
+    })().finally(() => refreshing.delete(userKey));
+    refreshing.set(userKey, run);
+    return run;
+  };
+
+  // Only a revoked key is forgotten: any other refusal keeps the stored
+  // connection, because its key can't be collected again.
+  const forgetIfRevoked = async (
+    userKey: string,
+    err: unknown,
+  ): Promise<void> => {
+    if (err instanceof OpenLLMError && err.keyRevoked)
+      await store.clear(userKey);
+  };
+
   const bind = (userKey: string, initial: TConnection): TConnectedUser => {
     let current = initial;
 
     const fresh = async (): Promise<TConnection> => {
+      if (current.expiresAt - Date.now() > REFRESH_SKEW_MS) return current;
       try {
-        const next = await refreshConnection(config(), current);
-        if (next !== current) {
-          current = next;
-          await store.save(userKey, next);
-        }
+        current = await refreshOnce(userKey, current);
         return current;
       } catch (err) {
-        if (err instanceof OpenLLMError && err.needsReconnect)
-          await store.clear(userKey);
+        await forgetIfRevoked(userKey, err);
         throw err;
       }
     };
@@ -113,7 +142,7 @@ export const createConnect = (params: CreateConnectParams): TConnect => {
       const res = await doFetch(path, init);
       if (res.ok) return res;
       const err = await errorFromResponse(res);
-      if (err.needsReconnect) await store.clear(userKey);
+      await forgetIfRevoked(userKey, err);
       throw err;
     };
 

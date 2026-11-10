@@ -237,7 +237,7 @@ export const refreshConnection = async (
   if (connection.refreshToken === null)
     throw new OpenLLMError(
       401,
-      "connector_reconnect",
+      "token_expired",
       "The access token expired and there is no refresh token: connect again",
     );
   const tokens = await tokenRequest(config, {

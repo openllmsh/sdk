@@ -23,6 +23,7 @@ export const CONNECT_ERROR_CODES = [
   "access_denied",
   "not_connected",
   "token_error",
+  "token_expired",
   "openllm_error",
 ] as const;
 
@@ -35,6 +36,7 @@ const RECONNECT: ReadonlySet<string> = new Set([
   "grant_expired",
   "no_pending_grant",
   "not_connected",
+  "token_expired",
 ]);
 
 const RETRYABLE: ReadonlySet<string> = new Set([
@@ -63,9 +65,21 @@ export class OpenLLMError extends Error {
     this.retryAfter = retryAfter;
   }
 
-  /** Send the user through connect again; the stored connection is dead. */
+  /**
+   * Send the user through connect again. Keep the stored connection unless
+   * `keyRevoked`: its `apiKey` can be collected only once, and reconnecting
+   * an active grant keeps it and takes fresh tokens.
+   */
   get needsReconnect(): boolean {
     return RECONNECT.has(this.code);
+  }
+
+  /**
+   * OpenLLM revoked this connection's key (the user disconnected or reset
+   * their vault): the stored connection is dead and safe to forget.
+   */
+  get keyRevoked(): boolean {
+    return this.code === "connector_reconnect";
   }
 
   /** Try the same call again later (`retryAfter` seconds when known). */
