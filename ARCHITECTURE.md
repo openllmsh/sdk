@@ -1,6 +1,6 @@
 # `@openllmsh/sdk` architecture
 
-One workspace package, seven internal layers. Boundaries that used to be
+One workspace package, eight internal layers. Boundaries that used to be
 enforced by separate `package.json` deps are enforced by
 `tests/sdk/layering.test.ts`.
 
@@ -10,6 +10,7 @@ protocol  ←  wire
           ←  openapi
 openapi + protocol  ←  mcp
 any SDK layer       ←  client   (no node:*)
+vault/crypto + vault/public-key-seal + wire SSE  ←  connect
 ```
 
 | Folder | May import | Detail |
@@ -22,6 +23,7 @@ any SDK layer       ←  client   (no node:*)
 | `openapi/` | `@openllmsh/sdk/protocol` (+ committed JSON) | Spec + operations table + `callOperation`. |
 | `mcp/` | `@openllmsh/sdk/openapi`, `@openllmsh/sdk/protocol`, `@openllmsh/sdk/client`, `@modelcontextprotocol/server` | Tool defs + `createMcpServer`; no `node:*`. |
 | `client/` | any SDK layer; no `node:*` | I/O-injected facade (`createClient`): vault session, HTTP (`callOperation`), device tunnel (relay-mux + open ladder). |
+| `connect/` | `@openllmsh/sdk/vault/crypto`, `@openllmsh/sdk/vault/public-key-seal`, `@openllmsh/sdk/wire/lib/streaming/sse` only | Server-side "Connect with OpenLLM" for third-party apps (`createConnect`, `connectRoutes`, `encryptedConnectionStore`): OAuth + PKCE, key pickup, token refresh, chat streaming, Fetch-API routes. Never the vault barrel (argon2 WASM). |
 
 Rules that apply to every folder:
 

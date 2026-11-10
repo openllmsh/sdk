@@ -8,6 +8,28 @@
 
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import { fromJsonSchema, McpServer } from "@modelcontextprotocol/server";
+import type { TPermission } from "@openllmsh/sdk/protocol";
+import { Permission } from "@openllmsh/sdk/protocol";
+
+export type { TPermission };
+
+const KNOWN_PERMISSIONS: ReadonlySet<string> = new Set(Permission.literals);
+
+/**
+ * The `permissions` of an `/api/user/tier` answer, keeping only names this
+ * SDK knows; `undefined` when absent (an older gateway: list everything and
+ * let the gateway refuse what the key can't do).
+ */
+export const parseKeyPermissions = (
+  value: unknown,
+): readonly TPermission[] | undefined =>
+  Array.isArray(value)
+    ? value.filter(
+        (p): p is TPermission =>
+          typeof p === "string" && KNOWN_PERMISSIONS.has(p),
+      )
+    : undefined;
+
 import type {
   TMarketplaceLaunch,
   TMarketplaceLaunchServer,
@@ -17,7 +39,7 @@ import {
   connectUpstreams,
   fetchMarketplaceLaunch,
   LAUNCH_TIMEOUT_MS,
-  upstreamToolName,
+  upstreamToolEntries,
 } from "./tools/marketplace";
 import {
   MODELS_TOOL_NAME,
@@ -62,6 +84,13 @@ export type TCreateMcpServerOptions = {
     args: Record<string, unknown>,
     config: TMcpGatewayConfig,
   ) => Promise<TToolResult>;
+  /**
+   * The calling key's permissions (`/api/user/tier`). When given, only tools
+   * the key may call are listed — a run-AI key is never offered account
+   * endpoints the gateway would refuse. Omit when unknown (fail open: the
+   * gateway still enforces every call).
+   */
+  readonly permissions?: readonly TPermission[];
 };
 
 /** One registration path for both negotiated stdio eras and local tests. */
@@ -72,8 +101,17 @@ export const createMcpServer = ({
   upstreams = [],
   includeFreeTierOnlyTools = false,
   transcribe,
+  permissions,
 }: TCreateMcpServerOptions): McpServer => {
+  const held =
+    permissions === undefined ? undefined : new Set<string>(permissions);
+  const mayCall = (name: string): boolean => {
+    if (held === undefined) return true;
+    const def = openllmToolDefs.find((tool) => tool.name === name);
+    return def !== undefined && held.has(def.permission);
+  };
   const openllmTools = openllmToolDefs.filter((tool) => {
+    if (!mayCall(tool.name)) return false;
     if (!includeFreeTierOnlyTools && isFreeTierOnlyTool(tool.name))
       return false;
     // Transcription needs a host-provided local-file handler.
@@ -114,6 +152,7 @@ export const createMcpServer = ({
         if (
           groups.includes("openllm") &&
           isMcpListedTool(name) &&
+          mayCall(name) &&
           (includeFreeTierOnlyTools || !isFreeTierOnlyTool(name))
         ) {
           if (name === TRANSCRIPTION_TOOL_NAME) {
@@ -161,46 +200,40 @@ export const attachMarketplaceUpstreams = (
 ): void => {
   // A duplicate name or an unconvertible schema skips that one tool only —
   // a bad vendor manifest must never take the built-in tools down with it.
-  const registered = new Set(alreadyRegistered);
-  for (const upstream of upstreams) {
-    for (const tool of upstream.tools) {
-      const name = upstreamToolName(upstream.id, tool.name);
-      if (registered.has(name)) {
-        console.warn(`[MCP] marketplace: skipping duplicate tool ${name}`);
-        continue;
-      }
-      try {
-        const upstreamConfig = {
-          ...(tool.description === undefined
-            ? {}
-            : { description: tool.description }),
-          ...(tool.annotations === undefined
-            ? {}
-            : {
-                annotations: tool.annotations as {
-                  readonly title?: string;
-                  readonly readOnlyHint?: boolean;
-                  readonly destructiveHint?: boolean;
-                  readonly idempotentHint?: boolean;
-                  readonly openWorldHint?: boolean;
-                },
-              }),
-          inputSchema: fromJsonSchema<Record<string, unknown>>(
-            tool.inputSchema,
-          ),
-        };
-        server.registerTool(
-          name,
-          upstreamConfig as unknown as Parameters<McpServer["registerTool"]>[1],
-          (args: Record<string, unknown>): Promise<CallToolResult> =>
-            upstream.call(tool.name, args),
-        );
-        registered.add(name);
-      } catch (err) {
-        console.warn(
-          `[MCP] marketplace: skipping ${name}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
+  const entries = upstreamToolEntries(upstreams, {
+    alreadyRegistered,
+    onDuplicate: (name) =>
+      console.warn(`[MCP] marketplace: skipping duplicate tool ${name}`),
+  });
+  for (const { name, upstream, tool } of entries) {
+    try {
+      const upstreamConfig = {
+        ...(tool.description === undefined
+          ? {}
+          : { description: tool.description }),
+        ...(tool.annotations === undefined
+          ? {}
+          : {
+              annotations: tool.annotations as {
+                readonly title?: string;
+                readonly readOnlyHint?: boolean;
+                readonly destructiveHint?: boolean;
+                readonly idempotentHint?: boolean;
+                readonly openWorldHint?: boolean;
+              },
+            }),
+        inputSchema: fromJsonSchema<Record<string, unknown>>(tool.inputSchema),
+      };
+      server.registerTool(
+        name,
+        upstreamConfig as unknown as Parameters<McpServer["registerTool"]>[1],
+        (args: Record<string, unknown>): Promise<CallToolResult> =>
+          upstream.call(tool.name, args),
+      );
+    } catch (err) {
+      console.warn(
+        `[MCP] marketplace: skipping ${name}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 };

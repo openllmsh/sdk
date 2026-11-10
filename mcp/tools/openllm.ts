@@ -13,8 +13,9 @@
 
 import { createClient } from "@openllmsh/sdk/client";
 import type { TApiOperation } from "@openllmsh/sdk/openapi";
-import { API_OPERATIONS } from "@openllmsh/sdk/openapi";
+import { API_OPERATIONS, resolveUrl } from "@openllmsh/sdk/openapi";
 import generatedSpec from "@openllmsh/sdk/openapi/spec.json";
+import type { TPermission } from "@openllmsh/sdk/protocol";
 import {
   KEEPALIVE_REQUEST_HEADER,
   OAUTH_PROVIDER_SLUGS,
@@ -264,11 +265,64 @@ const byToolName = new Map<string, TApiOperation>(
 const SESSION_ONLY_PATHS: ReadonlySet<string> = new Set([
   "/connect/apps",
   "/connect/clients/{client_id}",
+  "/connect/history",
+  "/keys",
   "/user/auth-methods",
   "/user/sessions",
   "/vault/handoff/pending",
   "/vault/handoff/{id}",
+  "/vault/migrate/rows",
 ]);
+
+/** Gateway-admin dashboards (`requireAdmin`): cross-user aggregates no agent
+ *  acting for one user should be offered. */
+const ADMIN_ONLY_PATHS: ReadonlySet<string> = new Set([
+  "/stats/admin",
+  "/stats/admin/value",
+]);
+
+/** Browser/ops plumbing with no use to an agent: listing them only spends
+ *  its context. */
+const NOT_FOR_AGENTS_PATHS: ReadonlySet<string> = new Set([
+  "/cookie-consent/region",
+  "/health",
+  "/public/usage-index",
+  "/version",
+]);
+
+/**
+ * The permission each listed non-`/v1` operation needs, by path prefix —
+ * the same gate its handler declares (`requireUser({ permission })`).
+ * Longest prefix wins. `/v1/*` needs `inference.use`; anything else NOT
+ * listed needs `account.manage`, so a new endpoint stays off a run-AI key's
+ * list until it is mapped here.
+ */
+const PERMISSION_BY_PREFIX: ReadonlyArray<readonly [string, TPermission]> = [
+  ["/user/tier", "inference.use"],
+  ["/marketplace/catalog", "mcp.use"],
+  ["/marketplace/installations", "mcp.use"],
+  ["/media", "media.read"],
+  ["/sessions", "sessions.read"],
+  ["/billing", "billing.manage"],
+  ["/config", "config.manage"],
+  ["/credentials", "credentials.manage"],
+  ["/providers", "credentials.manage"],
+  ["/stats", "stats.read"],
+  ["/keys", "keys.manage"],
+];
+
+/** What calling `op` needs from the key (see {@link PERMISSION_BY_PREFIX}). */
+export const permissionForOperation = (op: TApiOperation): TPermission => {
+  if (op.path.startsWith("/v1/")) return "inference.use";
+  let best: readonly [string, TPermission] | undefined;
+  for (const entry of PERMISSION_BY_PREFIX) {
+    const [prefix] = entry;
+    const matches = op.path === prefix || op.path.startsWith(`${prefix}/`);
+    if (matches && (best === undefined || prefix.length > best[0].length))
+      best = entry;
+  }
+  return best?.[1] ?? "account.manage";
+};
 
 /** Which operations surface as MCP tools an agent SEES (ListTools). This
  *  trims context bloat; it does NOT gate execution — `byToolName` above
@@ -289,6 +343,8 @@ const isMcpExposed = (op: TApiOperation): boolean => {
   if (GRAVITY_INDEX_TOOLS.has(toolNameFor(op))) return true;
   if (MUTATING.has(op.method) && !op.path.startsWith("/v1/")) return false;
   if (SESSION_ONLY_PATHS.has(op.path)) return false;
+  if (ADMIN_ONLY_PATHS.has(op.path)) return false;
+  if (NOT_FOR_AGENTS_PATHS.has(op.path)) return false;
   return true;
 };
 
@@ -296,12 +352,15 @@ type TToolDef = {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  /** What the caller's key must hold for the gateway to answer this tool. */
+  permission: TPermission;
 };
 
 const toolDef = (op: TApiOperation): TToolDef => ({
   name: toolNameFor(op),
   description: descriptionFor(op),
   inputSchema: inputSchemaFor(op),
+  permission: permissionForOperation(op),
 });
 
 /** The FULL native-API tool surface — every operation. Consumed by the
@@ -376,36 +435,6 @@ const textResult = (text: string, isError = false): TToolResult => ({
   content: [{ type: "text", text }],
   ...(isError ? { isError: true } : {}),
 });
-
-const resolveRawOperationUrl = (
-  config: { readonly baseUrl: string },
-  op: TApiOperation,
-  args: Record<string, unknown>,
-): string => {
-  let path = op.path;
-  for (const param of op.pathParams) {
-    const value = args[param];
-    if (value === undefined || value === null || String(value).length === 0) {
-      throw new Error(`missing required path parameter "${param}"`);
-    }
-    path = path.replace(`{${param}}`, encodeURIComponent(String(value)));
-  }
-  const url = new URL(
-    path.startsWith("/v1/") ? path : `/api${path}`,
-    config.baseUrl,
-  );
-  for (const query of op.queryParams) {
-    const value = args[query.name];
-    if (value === undefined || value === null) {
-      if (query.required) {
-        throw new Error(`missing required query parameter "${query.name}"`);
-      }
-      continue;
-    }
-    url.searchParams.set(query.name, String(value));
-  }
-  return url.toString();
-};
 
 /** Which model served — or refused — this request, from the headers the
  *  gateway attaches on BOTH outcomes. Empty when nothing was resolved. */
@@ -661,7 +690,7 @@ const mediaRedirectResult = async (
   args: Record<string, unknown>,
   kind: TMediaRedirectKind,
 ): Promise<TToolResult> => {
-  const url = resolveRawOperationUrl(config, op, args);
+  const url = resolveUrl(config, op, args);
   const body =
     op.hasBody && args.body !== undefined
       ? JSON.stringify(args.body)

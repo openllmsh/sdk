@@ -22,7 +22,9 @@
     "./mcp": "./mcp/index.ts",
     "./mcp/*": "./mcp/*.ts",
     "./client": "./client/index.ts",
-    "./client/*": "./client/*.ts"
+    "./client/*": "./client/*.ts",
+    "./connect": "./connect/index.ts",
+    "./connect/*": "./connect/*.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",

@@ -1,9 +1,12 @@
 /**
  * Marketplace integrations served THROUGH the one `openllm` MCP server.
  * Each enabled integration (`/api/marketplace/launch`) is dialled as an
- * upstream MCP server over Streamable HTTP / SSE only, and its tools are
- * re-exported as `<id>__<tool>`. Stdio launch entries are skipped — hosts
- * that need package entries must dial them outside this SDK module.
+ * upstream MCP server, and its tools are re-exported as `<id>__<tool>`.
+ *
+ * Dial transport is an injected {@link TMcpChannel}. The default is
+ * Streamable HTTP / SSE for remote launch entries; hosts that can spawn
+ * processes (the CLI) pass a stdio channel via `channel` / `channelFor`.
+ * Without a channel, stdio entries are skipped — a browser never dials them.
  *
  * A minimal JSON-RPC client: initialize → tools/list → tools/call. Every
  * upstream fails open on its own — a dead vendor drops only its tools.
@@ -11,19 +14,13 @@
 
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import { createClient } from "@openllmsh/sdk/client";
+import type { TMarketplaceLaunchServer } from "@openllmsh/sdk/protocol";
+import {
+  isMarketplaceLaunchServer,
+  isUpstreamToolExposed,
+} from "@openllmsh/sdk/protocol";
 
-/** One resolved MCP server from `/api/marketplace/launch`. */
-export type TMarketplaceLaunchServer = {
-  readonly id: string;
-  readonly transport: "http" | "sse" | "stdio";
-  readonly url?: string;
-  readonly headers?: Readonly<Record<string, string>>;
-  readonly command?: string;
-  readonly args?: readonly string[];
-  readonly env?: Readonly<Record<string, string>>;
-  /** Upstream tools never exposed — account-owner operations. */
-  readonly blocked_tools?: readonly string[];
-};
+export type { TMarketplaceLaunchServer };
 
 export type TMarketplaceLaunch = {
   readonly servers: readonly TMarketplaceLaunchServer[];
@@ -43,14 +40,13 @@ export type TUpstream = {
   close(): Promise<void>;
 };
 
-type TRpc = (
-  method: string,
-  params?: Record<string, unknown>,
-) => Promise<unknown>;
-type TNotify = (method: string) => Promise<void>;
-type TChannel = {
-  readonly rpc: TRpc;
-  readonly notify: TNotify;
+/** Injected JSON-RPC transport for one upstream MCP server. */
+export type TMcpChannel = {
+  readonly rpc: (
+    method: string,
+    params?: Record<string, unknown>,
+  ) => Promise<unknown>;
+  readonly notify: (method: string) => Promise<void>;
   readonly close: () => Promise<void>;
 };
 
@@ -75,32 +71,6 @@ export const upstreamToolName = (id: string, tool: string): string =>
 const RESERVED = new Set(["openllm"]);
 
 const EMPTY_LAUNCH: TMarketplaceLaunch = { servers: [] };
-
-const isStringRecord = (v: unknown): v is Record<string, string> =>
-  v !== null &&
-  typeof v === "object" &&
-  Object.values(v).every((x) => typeof x === "string");
-
-const isLaunchServer = (v: unknown): v is TMarketplaceLaunchServer => {
-  if (v === null || typeof v !== "object") return false;
-  const s = v as Record<string, unknown>;
-  return (
-    typeof s.id === "string" &&
-    /^[a-z][a-z0-9-]{1,47}$/.test(s.id) &&
-    (s.transport === "http" ||
-      s.transport === "sse" ||
-      s.transport === "stdio") &&
-    (s.url === undefined || typeof s.url === "string") &&
-    (s.headers === undefined || isStringRecord(s.headers)) &&
-    (s.command === undefined || typeof s.command === "string") &&
-    (s.args === undefined ||
-      (Array.isArray(s.args) && s.args.every((a) => typeof a === "string"))) &&
-    (s.env === undefined || isStringRecord(s.env)) &&
-    (s.blocked_tools === undefined ||
-      (Array.isArray(s.blocked_tools) &&
-        s.blocked_tools.every((t) => typeof t === "string")))
-  );
-};
 
 export type TFetchMarketplaceLaunchParams = {
   readonly cloudOrigin: string;
@@ -136,7 +106,9 @@ export const fetchMarketplaceLaunch = async (
         ? (res.body as { servers?: unknown })
         : {};
     const servers = Array.isArray(body.servers)
-      ? body.servers.filter(isLaunchServer).filter((s) => !RESERVED.has(s.id))
+      ? body.servers
+          .filter(isMarketplaceLaunchServer)
+          .filter((s) => !RESERVED.has(s.id))
       : [];
     return { servers };
   } catch {
@@ -177,7 +149,8 @@ const fromSse = (text: string, id: number): TRpcMessage | undefined => {
   return undefined;
 };
 
-const httpChannel = (server: TMarketplaceLaunchServer): TChannel => {
+/** Default Streamable HTTP / SSE channel for a remote launch entry. */
+export const httpChannel = (server: TMarketplaceLaunchServer): TMcpChannel => {
   const url = server.url ?? "";
   let sessionId: string | undefined;
   let nextId = 0;
@@ -200,7 +173,7 @@ const httpChannel = (server: TMarketplaceLaunchServer): TChannel => {
     sessionId = res.headers.get("mcp-session-id") ?? sessionId;
     return res;
   };
-  const rpc: TRpc = async (method, params = {}) => {
+  const rpc: TMcpChannel["rpc"] = async (method, params = {}) => {
     const id = ++nextId;
     const timeout =
       method === "tools/call" ? CALL_TIMEOUT_MS : CONNECT_TIMEOUT_MS;
@@ -256,7 +229,7 @@ const toTool = (v: unknown): TUpstreamTool | undefined => {
   };
 };
 
-const listTools = async (rpc: TRpc): Promise<TUpstreamTool[]> => {
+const listTools = async (rpc: TMcpChannel["rpc"]): Promise<TUpstreamTool[]> => {
   const tools: TUpstreamTool[] = [];
   let cursor: string | undefined;
   for (let page = 0; page < MAX_TOOL_PAGES; page++) {
@@ -280,25 +253,11 @@ const errorResult = (text: string): CallToolResult => ({
   isError: true,
 });
 
-export type TConnectUpstreamOptions = {
-  /** Client version string sent in MCP `initialize`. */
-  readonly clientVersion?: string;
-};
-
-/** Dial one HTTP/SSE upstream; rejects stdio and any handshake failure. */
-export const connectUpstream = async (
+const handshakeUpstream = async (
   server: TMarketplaceLaunchServer,
-  options: TConnectUpstreamOptions = {},
+  channel: TMcpChannel,
+  clientVersion: string,
 ): Promise<TUpstream> => {
-  if (server.transport === "stdio") {
-    throw new Error(
-      `${server.id}: stdio transport is not supported in sdk/mcp`,
-    );
-  }
-  if (server.url === undefined)
-    throw new Error(`${server.id}: incomplete launch entry`);
-  const channel = httpChannel(server);
-  const clientVersion = options.clientVersion ?? "0.0.0-dev";
   try {
     await channel.rpc("initialize", {
       protocolVersion: PROTOCOL_VERSION,
@@ -306,15 +265,16 @@ export const connectUpstream = async (
       clientInfo: { name: "openllm", version: clientVersion },
     });
     await channel.notify("notifications/initialized");
-    const blocked = new Set(server.blocked_tools ?? []);
-    const tools = (await listTools(channel.rpc)).filter(
-      (tool) => !blocked.has(tool.name),
+    const exposed = (name: string): boolean =>
+      isUpstreamToolExposed(server, name);
+    const tools = (await listTools(channel.rpc)).filter((tool) =>
+      exposed(tool.name),
     );
     return {
       id: server.id,
       tools,
       call: async (name, args) => {
-        if (blocked.has(name))
+        if (!exposed(name))
           return errorResult(`${server.id}: ${name} is not available`);
         try {
           const result = await channel.rpc("tools/call", {
@@ -338,35 +298,142 @@ export const connectUpstream = async (
   }
 };
 
+const defaultChannelFor = (
+  server: TMarketplaceLaunchServer,
+): TMcpChannel | undefined => {
+  if (server.transport === "stdio") return undefined;
+  if (server.url === undefined) return undefined;
+  return httpChannel(server);
+};
+
+export type TConnectUpstreamOptions = {
+  /** Client version string sent in MCP `initialize`. */
+  readonly clientVersion?: string;
+  /** Injected JSON-RPC channel. Defaults to HTTP/SSE for remote transports. */
+  readonly channel?: TMcpChannel;
+};
+
+/** Dial one upstream over `channel` (or the default HTTP/SSE channel). */
+export const connectUpstream = async (
+  server: TMarketplaceLaunchServer,
+  options: TConnectUpstreamOptions = {},
+): Promise<TUpstream> => {
+  const channel = options.channel ?? defaultChannelFor(server);
+  if (channel === undefined) {
+    if (server.transport === "stdio") {
+      throw new Error(
+        `${server.id}: stdio transport requires an injected channel`,
+      );
+    }
+    throw new Error(`${server.id}: incomplete launch entry`);
+  }
+  return handshakeUpstream(
+    server,
+    channel,
+    options.clientVersion ?? "0.0.0-dev",
+  );
+};
+
 export type TConnectUpstreamsOptions = {
   readonly clientVersion?: string;
   /** Optional warning sink (defaults to `console.warn`). */
   readonly onWarn?: (message: string) => void;
+  /**
+   * Host-supplied channel for a server (e.g. Bun.spawn stdio). When omitted
+   * for a stdio entry, that entry is skipped; remote entries still use HTTP.
+   */
+  readonly channelFor?: (
+    server: TMarketplaceLaunchServer,
+  ) => TMcpChannel | undefined;
 };
 
-/** Dial every HTTP/SSE upstream in parallel; stdio + failures are skipped. */
+/** Dial every upstream in parallel; failures are warned and dropped. */
 export const connectUpstreams = async (
   servers: readonly TMarketplaceLaunchServer[],
   options: TConnectUpstreamsOptions = {},
 ): Promise<readonly TUpstream[]> => {
   const warn = options.onWarn ?? ((message: string) => console.warn(message));
-  const remote = servers.filter((server) => {
-    if (server.transport !== "stdio") return true;
-    warn(
-      `[MCP] marketplace ${server.id}: skipping stdio transport (not supported in sdk/mcp)`,
-    );
-    return false;
+  const dialable = servers.flatMap((server) => {
+    // A host channel can throw synchronously (Bun.spawn on a missing
+    // command): skip that one server, never the whole set.
+    let channel: TMcpChannel | undefined;
+    try {
+      channel = options.channelFor?.(server) ?? defaultChannelFor(server);
+    } catch (err) {
+      warn(
+        `[MCP] marketplace ${server.id}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return [];
+    }
+    if (channel === undefined) {
+      warn(
+        server.transport === "stdio"
+          ? `[MCP] marketplace ${server.id}: skipping stdio transport (no channel)`
+          : `[MCP] marketplace ${server.id}: incomplete launch entry`,
+      );
+      return [];
+    }
+    return [{ server, channel }];
   });
   const settled = await Promise.allSettled(
-    remote.map((server) =>
-      connectUpstream(server, { clientVersion: options.clientVersion }),
+    dialable.map(({ server, channel }) =>
+      handshakeUpstream(server, channel, options.clientVersion ?? "0.0.0-dev"),
     ),
   );
-  return settled.flatMap((r, i) => {
-    if (r.status === "fulfilled") return [r.value];
+  const byId = new Map<string, TUpstream>();
+  for (let i = 0; i < settled.length; i++) {
+    const r = settled[i];
+    const id = dialable[i]?.server.id;
+    if (r === undefined || id === undefined) continue;
+    if (r.status === "fulfilled") {
+      byId.set(id, r.value);
+      continue;
+    }
     warn(
-      `[MCP] marketplace ${remote[i]?.id}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`,
+      `[MCP] marketplace ${id}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`,
     );
-    return [];
+  }
+  // Preserve launch order.
+  return servers.flatMap((server) => {
+    const upstream = byId.get(server.id);
+    return upstream === undefined ? [] : [upstream];
   });
+};
+
+export type TUpstreamToolEntry = {
+  readonly name: string;
+  readonly upstream: TUpstream;
+  readonly tool: TUpstreamTool;
+};
+
+export type TUpstreamToolEntriesOptions = {
+  readonly alreadyRegistered?: ReadonlySet<string>;
+  /** Return false to drop a composed `<id>__<tool>` name (e.g. OpenAI regex). */
+  readonly nameGuard?: (name: string) => boolean;
+  readonly onDuplicate?: (name: string) => void;
+};
+
+/**
+ * Deduped `<id>__<tool>` entries across marketplace upstreams. Shared by the
+ * MCP server registration path and the browser chat function-tool surface.
+ */
+export const upstreamToolEntries = (
+  upstreams: readonly TUpstream[],
+  options: TUpstreamToolEntriesOptions = {},
+): readonly TUpstreamToolEntry[] => {
+  const registered = new Set(options.alreadyRegistered ?? []);
+  const out: TUpstreamToolEntry[] = [];
+  for (const upstream of upstreams) {
+    for (const tool of upstream.tools) {
+      const name = upstreamToolName(upstream.id, tool.name);
+      if (options.nameGuard !== undefined && !options.nameGuard(name)) continue;
+      if (registered.has(name)) {
+        options.onDuplicate?.(name);
+        continue;
+      }
+      registered.add(name);
+      out.push({ name, upstream, tool });
+    }
+  }
+  return out;
 };

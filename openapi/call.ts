@@ -27,7 +27,7 @@ export type TSdkResponse = {
 };
 
 /** Substitute `{param}` path segments and collect query params. */
-const resolveUrl = (
+export const resolveUrl = (
   config: TSdkConfig,
   op: TApiOperation,
   args: Record<string, unknown>,
