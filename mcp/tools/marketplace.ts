@@ -352,8 +352,17 @@ export const connectUpstreams = async (
 ): Promise<readonly TUpstream[]> => {
   const warn = options.onWarn ?? ((message: string) => console.warn(message));
   const dialable = servers.flatMap((server) => {
-    const injected = options.channelFor?.(server);
-    const channel = injected ?? defaultChannelFor(server);
+    // A host channel can throw synchronously (Bun.spawn on a missing
+    // command): skip that one server, never the whole set.
+    let channel: TMcpChannel | undefined;
+    try {
+      channel = options.channelFor?.(server) ?? defaultChannelFor(server);
+    } catch (err) {
+      warn(
+        `[MCP] marketplace ${server.id}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return [];
+    }
     if (channel === undefined) {
       warn(
         server.transport === "stdio"
