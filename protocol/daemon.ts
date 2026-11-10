@@ -9,6 +9,7 @@ import {
 import { CooldownReason } from "./cooldown-reason";
 import { DaemonReportingPolicy } from "./doctor-report-policy";
 import { ExecutionSelection } from "./execution-selection";
+import { AUTH_OPERATIONS, AUTH_RELAY_WAIT_MAX_MS } from "./local-auth";
 import {
   DeviceAccessPinReport,
   DeviceSessionsReport,
@@ -697,6 +698,39 @@ const RefreshPayload = S.Struct({
   account_index: S.optional(AccountIndex),
   manual: S.optional(S.Boolean),
 });
+/** One `openllm auth …` request run on the device by the same handler the CLI
+ *  and MCP reach over loopback (`/local/auth`), so every surface shares one
+ *  contract and one reply. The paste-back code never travels in clear:
+ *  `sealed_code` is an X25519 sealed box to the daemon's pubkey. The daemon
+ *  re-validates the opened request with `parseLocalAuthRequest`. */
+const AuthPayload = S.Struct({
+  operation: S.Literals(AUTH_OPERATIONS),
+  provider: S.optional(S.String.check(S.isPattern(/^[a-z][a-z0-9_]{0,63}$/))),
+  method: S.optional(S.Literals(["browser", "device"])),
+  flow_id: S.optional(S.String.check(S.isPattern(/^[a-zA-Z0-9_-]{1,128}$/))),
+  account: S.optional(AccountIndex),
+  label: S.optional(S.String.check(S.isMinLength(1), S.isMaxLength(64))),
+  since: S.optional(S.String.check(S.isPattern(/^[a-f0-9]{1,64}$/))),
+  wait_ms: S.optional(
+    S.Int.check(
+      S.isGreaterThanOrEqualTo(0),
+      S.isLessThanOrEqualTo(AUTH_RELAY_WAIT_MAX_MS),
+    ),
+  ),
+  sealed_code: S.optional(Base64Blob),
+});
+export type TAuthPayload = S.Schema.Type<typeof AuthPayload>;
+/** Decoding strips unknown keys, so enqueue boundaries also refuse any raw
+ *  key outside this set — a plaintext `code` never transits the relay. */
+export const AUTH_PAYLOAD_KEYS: ReadonlySet<string> = new Set(
+  Object.keys(AuthPayload.fields),
+);
+export const authPayloadKeysAllowed = (payload: unknown): boolean =>
+  payload !== null &&
+  typeof payload === "object" &&
+  !Array.isArray(payload) &&
+  Object.keys(payload).every((key) => AUTH_PAYLOAD_KEYS.has(key));
+
 /** Payload-less commands (`status` / `update`): accept an absent payload or a
  *  bare `{}` so every union member carries the field (uniform access). */
 const EmptyPayload = S.Struct({});
@@ -718,6 +752,11 @@ const EmptyPayload = S.Struct({});
  */
 const commandVariants = <F extends S.Struct.Fields>(addressing: F) =>
   [
+    S.Struct({
+      ...addressing,
+      kind: S.Literals(["auth"]),
+      payload: AuthPayload,
+    }),
     S.Struct({
       ...addressing,
       kind: S.Literals(["connect"]),
@@ -881,6 +920,7 @@ export type TDaemonCommandKind = TDaemonCommandBody["kind"];
  *  this fail to compile if it ever drifts from the `commandVariants` union, so
  *  the two stay in lockstep without duplicating the payload mapping. */
 export const DaemonCommandKind = S.Literals([
+  "auth",
   "connect",
   "connect_device_code",
   "cancel_connect",
