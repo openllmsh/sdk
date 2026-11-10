@@ -720,6 +720,20 @@ export const API_OPERATIONS: readonly TApiOperation[] = [
     "hasBody": true
   },
   {
+    "id": "keys.armDaemonIdentity",
+    "method": "post",
+    "path": "/keys/{id}/daemon-identity/arm",
+    "summary": "",
+    "tags": [
+      "keys"
+    ],
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "hasBody": false
+  },
+  {
     "id": "keys.resetDaemonIdentity",
     "method": "post",
     "path": "/keys/{id}/daemon-identity/reset",
