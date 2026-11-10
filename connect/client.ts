@@ -189,9 +189,11 @@ export const createConnect = (params: CreateConnectParams): TConnect => {
         const json = (await res.json()) as { data?: TModelInfo[] };
         return json.data ?? [];
       },
-      // Forget the connection only once OpenLLM revoked it (or it is already
-      // dead). A network error or 5xx keeps it, so the caller can retry:
-      // forgetting a live grant would strand the user on already_picked_up.
+      // Forget the connection only once OpenLLM confirms the key is gone: the
+      // revoke succeeded, the grant was already gone (404), or the key was
+      // revoked. Anything else (network, 5xx, a failed refresh) keeps it so
+      // the caller can retry: forgetting a live grant would strand the user
+      // on already_picked_up.
       disconnect: async () => {
         try {
           const res = await doFetch("/api/connect/grants/revoke", {
@@ -199,10 +201,10 @@ export const createConnect = (params: CreateConnectParams): TConnect => {
           });
           if (!res.ok && res.status !== 404) {
             const err = await errorFromResponse(res);
-            if (!err.needsReconnect) throw err;
+            if (!err.keyRevoked) throw err;
           }
         } catch (err) {
-          if (!(err instanceof OpenLLMError && err.needsReconnect)) throw err;
+          if (!(err instanceof OpenLLMError && err.keyRevoked)) throw err;
         }
         await store.clear(userKey);
       },

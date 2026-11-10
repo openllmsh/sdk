@@ -43,8 +43,13 @@ const readCookie = (req: Request, name: string): string | null => {
   for (const part of header.split(";")) {
     const eq = part.indexOf("=");
     if (eq === -1) continue;
-    if (part.slice(0, eq).trim() === name)
+    if (part.slice(0, eq).trim() !== name) continue;
+    // The browser controls this value: a malformed escape is no cookie.
+    try {
       return decodeURIComponent(part.slice(eq + 1).trim());
+    } catch {
+      return null;
+    }
   }
   return null;
 };
@@ -77,15 +82,17 @@ const parsePending = (raw: string | null): TPendingConnect | null => {
   }
 };
 
-/** An `OpenLLMError` as the `{ error: { code, message } }` JSON OpenLLM uses. */
+/**
+ * An `OpenLLMError` as the `{ error: { code, message } }` JSON OpenLLM uses.
+ * Any other failure answers a fixed message: its text can carry internals
+ * (paths, hosts, config) and these responses reach the browser. The original
+ * is logged server-side.
+ */
 export const errorResponse = (err: unknown): Response => {
+  if (!isOpenLLMError(err)) console.error("[openllm/connect]", err);
   const e = isOpenLLMError(err)
     ? err
-    : new OpenLLMError(
-        500,
-        "openllm_error",
-        err instanceof Error ? err.message : String(err),
-      );
+    : new OpenLLMError(500, "openllm_error", "Something went wrong");
   const headers: Record<string, string> = {};
   if (e.retryAfter !== null) headers["retry-after"] = String(e.retryAfter);
   return Response.json(

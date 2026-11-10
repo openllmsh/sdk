@@ -29,7 +29,12 @@ export type TStringStore = {
 const SEAL_VERSION = "v1";
 
 const keyBytes = (secretB64: string): Uint8Array => {
-  const bytes = fromB64(secretB64);
+  let bytes: Uint8Array;
+  try {
+    bytes = fromB64(secretB64);
+  } catch {
+    bytes = new Uint8Array(0);
+  }
   if (bytes.length !== 32)
     throw new Error("The connection secret must be 32 bytes, base64");
   return bytes;
@@ -58,9 +63,12 @@ export const encryptedConnectionStore = (
       const [version, nonce, ct] = raw.split(".");
       if (version !== SEAL_VERSION || nonce === undefined || ct === undefined)
         return null;
+      // Outside the try: a bad secret is a config error and must surface,
+      // not read as "not connected".
+      const keyBytesForLoad = secretKey();
       try {
         const plain = await aesGcmDecrypt(
-          secretKey(),
+          keyBytesForLoad,
           fromB64(nonce),
           fromB64(ct),
           aadFor(key),
