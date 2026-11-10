@@ -39098,6 +39098,20 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "access": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "full",
+                                  "use"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "required": [
