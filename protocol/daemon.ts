@@ -1194,13 +1194,15 @@ export type TDaemonTeamKeyEpoch = S.Schema.Type<typeof DaemonTeamKeyEpoch>;
 export const PENDING_AUTH_TTL_MS = 10 * 60_000;
 
 // Outcome of the daemon's last cloud bootstrap — drives the dashboard's
-// 3-state Providers UI: needs a key (`no_key`/`invalid_key`) → show the
-// API-key picker; `unreachable` → retry hint; `ok` → provider cards.
+// Providers UI: needs a key (`no_key`/`invalid_key`) → show the API-key
+// picker; `unreachable` → retry hint; `connecting` → first bootstrap still
+// in flight (key is configured, outcome unknown); `ok` → provider cards.
 export const DaemonCloudState = S.Literals([
   "ok",
   "no_key",
   "invalid_key",
   "unreachable",
+  "connecting",
 ]);
 export type TDaemonCloudState = S.Schema.Type<typeof DaemonCloudState>;
 
