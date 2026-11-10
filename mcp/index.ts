@@ -40,8 +40,11 @@ export type {
   TFetchMarketplaceLaunchParams,
   TMarketplaceLaunch,
   TMarketplaceLaunchServer,
+  TMcpChannel,
   TUpstream,
   TUpstreamTool,
+  TUpstreamToolEntriesOptions,
+  TUpstreamToolEntry,
 } from "./tools/marketplace";
 export {
   CALL_TIMEOUT_MS,
@@ -49,8 +52,10 @@ export {
   connectUpstream,
   connectUpstreams,
   fetchMarketplaceLaunch,
+  httpChannel,
   LAUNCH_TIMEOUT_MS,
   UPSTREAM_TOOL_SEPARATOR,
+  upstreamToolEntries,
   upstreamToolName,
 } from "./tools/marketplace";
 export { handleMemoryTool, memoryToolDefs } from "./tools/memory";
@@ -66,3 +71,4 @@ export { MemoryClient } from "./tools/memory-client";
 export type { MemoryConfig, TProjectRef } from "./tools/memory-config";
 export { COLLECTION_NAME } from "./tools/memory-config";
 export type { TToolResult, TToolResultContent } from "./types";
+export { toolResultText } from "./types";

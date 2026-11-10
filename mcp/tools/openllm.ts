@@ -13,7 +13,7 @@
 
 import { createClient } from "@openllmsh/sdk/client";
 import type { TApiOperation } from "@openllmsh/sdk/openapi";
-import { API_OPERATIONS } from "@openllmsh/sdk/openapi";
+import { API_OPERATIONS, resolveUrl } from "@openllmsh/sdk/openapi";
 import generatedSpec from "@openllmsh/sdk/openapi/spec.json";
 import {
   KEEPALIVE_REQUEST_HEADER,
@@ -377,36 +377,6 @@ const textResult = (text: string, isError = false): TToolResult => ({
   ...(isError ? { isError: true } : {}),
 });
 
-const resolveRawOperationUrl = (
-  config: { readonly baseUrl: string },
-  op: TApiOperation,
-  args: Record<string, unknown>,
-): string => {
-  let path = op.path;
-  for (const param of op.pathParams) {
-    const value = args[param];
-    if (value === undefined || value === null || String(value).length === 0) {
-      throw new Error(`missing required path parameter "${param}"`);
-    }
-    path = path.replace(`{${param}}`, encodeURIComponent(String(value)));
-  }
-  const url = new URL(
-    path.startsWith("/v1/") ? path : `/api${path}`,
-    config.baseUrl,
-  );
-  for (const query of op.queryParams) {
-    const value = args[query.name];
-    if (value === undefined || value === null) {
-      if (query.required) {
-        throw new Error(`missing required query parameter "${query.name}"`);
-      }
-      continue;
-    }
-    url.searchParams.set(query.name, String(value));
-  }
-  return url.toString();
-};
-
 /** Which model served — or refused — this request, from the headers the
  *  gateway attaches on BOTH outcomes. Empty when nothing was resolved. */
 const attributionFromHeaders = (headers: Headers): string => {
@@ -661,7 +631,7 @@ const mediaRedirectResult = async (
   args: Record<string, unknown>,
   kind: TMediaRedirectKind,
 ): Promise<TToolResult> => {
-  const url = resolveRawOperationUrl(config, op, args);
+  const url = resolveUrl(config, op, args);
   const body =
     op.hasBody && args.body !== undefined
       ? JSON.stringify(args.body)

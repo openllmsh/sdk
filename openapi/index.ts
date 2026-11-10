@@ -1,5 +1,6 @@
 export {
   callOperation,
+  resolveUrl,
   type THttpClientOptions,
   type TSdkConfig,
   type TSdkResponse,

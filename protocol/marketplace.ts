@@ -1,4 +1,5 @@
 import { Effect, Schema as S } from "effect";
+import * as Result from "effect/Result";
 
 /**
  * Marketplace entry — one integration a user can enable. Same shape for the
@@ -130,7 +131,7 @@ export type TMarketplaceEntry = S.Schema.Type<typeof MarketplaceEntry>;
  * decrypted. Returned only to the owning user's own CLI.
  */
 export const MarketplaceLaunchServer = S.Struct({
-  id: S.String,
+  id: S.String.check(S.isPattern(/^[a-z][a-z0-9-]{1,47}$/)),
   transport: S.Literals(["http", "sse", "stdio"]),
   url: S.optional(S.String),
   headers: S.optional(S.Record(S.String, S.String)),
@@ -143,6 +144,14 @@ export const MarketplaceLaunchServer = S.Struct({
 export type TMarketplaceLaunchServer = S.Schema.Type<
   typeof MarketplaceLaunchServer
 >;
+
+/** Fail-open predicate for one `/api/marketplace/launch` server entry. */
+export const isMarketplaceLaunchServer = (
+  value: unknown,
+): value is TMarketplaceLaunchServer => {
+  const result = S.decodeUnknownResult(MarketplaceLaunchServer)(value);
+  return Result.isSuccess(result);
+};
 
 export const MarketplaceLaunchResponse = S.Struct({
   servers: S.Array(MarketplaceLaunchServer),

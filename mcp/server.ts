@@ -17,7 +17,7 @@ import {
   connectUpstreams,
   fetchMarketplaceLaunch,
   LAUNCH_TIMEOUT_MS,
-  upstreamToolName,
+  upstreamToolEntries,
 } from "./tools/marketplace";
 import {
   MODELS_TOOL_NAME,
@@ -161,46 +161,40 @@ export const attachMarketplaceUpstreams = (
 ): void => {
   // A duplicate name or an unconvertible schema skips that one tool only —
   // a bad vendor manifest must never take the built-in tools down with it.
-  const registered = new Set(alreadyRegistered);
-  for (const upstream of upstreams) {
-    for (const tool of upstream.tools) {
-      const name = upstreamToolName(upstream.id, tool.name);
-      if (registered.has(name)) {
-        console.warn(`[MCP] marketplace: skipping duplicate tool ${name}`);
-        continue;
-      }
-      try {
-        const upstreamConfig = {
-          ...(tool.description === undefined
-            ? {}
-            : { description: tool.description }),
-          ...(tool.annotations === undefined
-            ? {}
-            : {
-                annotations: tool.annotations as {
-                  readonly title?: string;
-                  readonly readOnlyHint?: boolean;
-                  readonly destructiveHint?: boolean;
-                  readonly idempotentHint?: boolean;
-                  readonly openWorldHint?: boolean;
-                },
-              }),
-          inputSchema: fromJsonSchema<Record<string, unknown>>(
-            tool.inputSchema,
-          ),
-        };
-        server.registerTool(
-          name,
-          upstreamConfig as unknown as Parameters<McpServer["registerTool"]>[1],
-          (args: Record<string, unknown>): Promise<CallToolResult> =>
-            upstream.call(tool.name, args),
-        );
-        registered.add(name);
-      } catch (err) {
-        console.warn(
-          `[MCP] marketplace: skipping ${name}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
+  const entries = upstreamToolEntries(upstreams, {
+    alreadyRegistered,
+    onDuplicate: (name) =>
+      console.warn(`[MCP] marketplace: skipping duplicate tool ${name}`),
+  });
+  for (const { name, upstream, tool } of entries) {
+    try {
+      const upstreamConfig = {
+        ...(tool.description === undefined
+          ? {}
+          : { description: tool.description }),
+        ...(tool.annotations === undefined
+          ? {}
+          : {
+              annotations: tool.annotations as {
+                readonly title?: string;
+                readonly readOnlyHint?: boolean;
+                readonly destructiveHint?: boolean;
+                readonly idempotentHint?: boolean;
+                readonly openWorldHint?: boolean;
+              },
+            }),
+        inputSchema: fromJsonSchema<Record<string, unknown>>(tool.inputSchema),
+      };
+      server.registerTool(
+        name,
+        upstreamConfig as unknown as Parameters<McpServer["registerTool"]>[1],
+        (args: Record<string, unknown>): Promise<CallToolResult> =>
+          upstream.call(tool.name, args),
+      );
+    } catch (err) {
+      console.warn(
+        `[MCP] marketplace: skipping ${name}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 };
