@@ -1164,6 +1164,10 @@ export type TDaemonProviderConnection = S.Schema.Type<
  *  Senders must not address account n >= 1 without it (old daemons strip the
  *  field and would act on account 0). */
 export const MULTI_ACCOUNT_CONTROL_CAP = "multi_account";
+/** Control cap: the daemon runs the unified `auth` command (kind `"auth"`).
+ *  Older daemons drop an unknown kind silently; the browser must refuse with
+ *  `daemon_outdated` when this cap is absent rather than waiting out a timeout. */
+export const AUTH_CONTROL_CAP = "auth";
 /** Control cap: the daemon stores `local_key` provider keys
  *  (`set_provider_key`) and reports each slot as a `connections` row. */
 export const LOCAL_KEY_PROVIDERS_CONTROL_CAP = "local_key_providers_v1";
