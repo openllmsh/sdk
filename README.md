@@ -1,16 +1,17 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: light)" srcset="./assets/openllm-light.svg">
-    <img alt="OpenLLM" src="./assets/openllm.svg" width="300">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/openllmsh/sdk/main/assets/openllm-light.svg">
+    <img alt="OpenLLM" src="https://raw.githubusercontent.com/openllmsh/sdk/main/assets/openllm.svg" width="300">
   </picture>
 </p>
 
 <p align="center"><b>@openllmsh/sdk</b> — everything a client needs to talk to OpenLLM.</p>
 
 <p align="center">
-  <a href="./LICENSE"><img alt="License: Apache-2.0 AND BUSL-1.1" src="https://img.shields.io/badge/license-Apache--2.0%20%2B%20BUSL--1.1-blue.svg"></a>
-  <img alt="runtime" src="https://img.shields.io/badge/Bun%20%C2%B7%20Node%20%C2%B7%20browser-TypeScript-black.svg">
-  <img alt="deps: effect" src="https://img.shields.io/badge/deps-effect-blue.svg">
+  <a href="https://www.npmjs.com/package/@openllmsh/sdk"><img alt="npm" src="https://img.shields.io/npm/v/@openllmsh/sdk.svg"></a>
+  <a href="https://www.npmjs.com/package/@openllmsh/sdk?activeTab=versions"><img alt="npm next" src="https://img.shields.io/npm/v/@openllmsh/sdk/next.svg?label=next"></a>
+  <a href="https://github.com/openllmsh/sdk/blob/main/LICENSE"><img alt="License: Apache-2.0 AND BUSL-1.1" src="https://img.shields.io/badge/license-Apache--2.0%20%2B%20BUSL--1.1-blue.svg"></a>
+  <img alt="ships TypeScript source" src="https://img.shields.io/badge/ships-TypeScript%20source-black.svg">
 </p>
 
 ---
@@ -27,7 +28,7 @@ under a single version.
   (Argon2id, AES-256-GCM, HKDF, X25519 seals) and zeroes key material on close.
 - **I/O injected, runs anywhere.** `client` and `mcp` take `fetch`, `WebSocket`
   and an RTC factory from the host, so the same code runs in the browser, in
-  Bun and in Node.
+  Bun and in a bundled Node app.
 - **One contract for HTTP and MCP.** `openapi` ships the public spec with a
   typed `callOperation()`; `mcp` derives its tools from the same operations.
 
@@ -37,10 +38,26 @@ which.
 ## Install
 
 ```sh
-bun install github:openllmsh/sdk#vX.Y.Z
+npm install @openllmsh/sdk        # or: bun add / pnpm add / yarn add
+npm install @openllmsh/sdk@next   # the latest prerelease
 ```
 
-Releases are tagged with the OpenLLM release version; pin a tag.
+Versions follow the OpenLLM release version. Each npm release is published by
+CI from this repository with [provenance](https://docs.npmjs.com/generating-provenance-statements);
+the same source is tagged here, so `bun add github:openllmsh/sdk#vX.Y.Z` pins
+the identical code.
+
+### Runtimes
+
+The package ships its TypeScript source (no compiled JavaScript), so it needs a
+runtime or build step that reads `.ts`:
+
+| Where | Works |
+| --- | --- |
+| Bun | Yes, import it directly. |
+| A bundler: Vite, esbuild, webpack, Next.js, Rollup | Yes. Set `"moduleResolution": "Bundler"` in your `tsconfig.json`. |
+| Node, running the bundled output | Yes. |
+| Node, importing straight from `node_modules` | Not yet: Node refuses to strip types inside `node_modules`. Bundle your app first. |
 
 ## Quickstart
 
@@ -124,6 +141,7 @@ import { parseApiKey, sealCliAuth } from "@openllmsh/sdk/vault";
 | `@openllmsh/sdk/openapi` | The committed OpenAPI spec, the operations table and `callOperation()`. |
 | `@openllmsh/sdk/openapi/spec.json` | The OpenAPI document itself, as served at `/api/swagger`. |
 | `@openllmsh/sdk/mcp` | MCP tool definitions (API, memory, marketplace upstreams) and `createMcpServer` over an injected transport. |
+| `@openllmsh/sdk/connect` | "Connect with OpenLLM" for your app's server: `createConnect` and `connectRoutes`. |
 | `@openllmsh/sdk/client` | The facade above: vault session, HTTP and chat, device tunnel. Composition only — no protocol or crypto of its own. |
 
 ## License

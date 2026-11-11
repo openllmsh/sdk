@@ -2,6 +2,17 @@
   "name": "@openllmsh/sdk",
   "version": "0.0.0",
   "private": false,
+  "description": "The OpenLLM SDK: typed API contracts, wire-format adapters, the device tunnel, client-side vault crypto, the OpenAPI spec and MCP tools.",
+  "keywords": [
+    "openllm",
+    "llm",
+    "gateway",
+    "openai",
+    "anthropic",
+    "mcp",
+    "sdk"
+  ],
+  "homepage": "https://github.com/openllmsh/sdk#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/openllmsh/sdk.git"
