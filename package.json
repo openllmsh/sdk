@@ -1,6 +1,6 @@
 {
   "name": "@openllmsh/sdk",
-  "version": "0.0.0",
+  "version": "2.10.11-alpha.6",
   "private": false,
   "type": "module",
   "exports": {
