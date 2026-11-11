@@ -16,7 +16,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write # npm provenance
+  id-token: write # npm trusted publishing (OIDC) + provenance
 
 concurrency:
   group: npm-publish-${{ github.event.release.tag_name }}
@@ -73,11 +73,18 @@ jobs:
             echo "published=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # Trusted publishing (OIDC): npm trusts this repo + this workflow file, so
+      # there is no token. Provenance is attached automatically.
       - name: Publish
         if: steps.exists.outputs.published != 'true'
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           DIST_TAG: ${{ steps.meta.outputs.dist_tag }}
         run: |
+          set -euo pipefail
+          npm_version="$(npm --version)"
+          if [ "$(printf '%s\n' 11.5.1 "${npm_version}" | sort -V | head -1)" != "11.5.1" ]; then
+            echo "::error::npm ${npm_version} is too old for trusted publishing (needs >= 11.5.1)"
+            exit 1
+          fi
           npm pack --dry-run
-          npm publish --access public --provenance --tag "${DIST_TAG}"
+          npm publish --access public --tag "${DIST_TAG}"
