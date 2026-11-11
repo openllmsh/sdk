@@ -9,6 +9,7 @@ import type {
   TSdkResponse,
 } from "@openllmsh/sdk/openapi";
 import { API_OPERATIONS, callOperation } from "@openllmsh/sdk/openapi";
+import { canonicalApiOrigin } from "@openllmsh/sdk/protocol/canonical-origin";
 
 export type TClientHttpOptions = {
   readonly origin: string;
@@ -44,7 +45,7 @@ const resolveOp = (op: TApiOperation | string): TApiOperation => {
 };
 
 export const createClientHttp = (options: TClientHttpOptions): TClientHttp => {
-  const baseUrl = options.origin.replace(/\/+$/, "");
+  const baseUrl = canonicalApiOrigin(options.origin);
   const config = { baseUrl, apiKey: options.apiKey };
 
   return {

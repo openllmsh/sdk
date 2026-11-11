@@ -29,7 +29,9 @@ export type TClientTransport = {
 };
 
 export type TCreateClientOptions = {
-  /** Cloud origin, e.g. `https://openllm.sh`. Trailing slashes are stripped. */
+  /** Cloud origin, e.g. `https://www.openllm.sh`. Trailing slashes are
+   *  stripped, and the apex `https://openllm.sh` is sent to `www` (the apex
+   *  redirects, and `fetch` drops the API key on that redirect). */
   readonly origin: string;
   /**
    * `sk-llm-…` API key. May be empty while a CLI-auth claim is still opening

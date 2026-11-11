@@ -3,6 +3,7 @@
  * layers. Vault session, HTTP, and device tunnel (mux ladder + relay-mux).
  */
 
+import { canonicalApiOrigin } from "@openllmsh/sdk/protocol/canonical-origin";
 import type { TClientChat } from "./chat";
 import { createClientChat } from "./chat";
 import type { TClientDevices, TClientDevicesHost } from "./devices";
@@ -72,8 +73,6 @@ export type TOpenllmClient = {
   readonly close: () => void;
 };
 
-const normalizeOrigin = (origin: string): string => origin.replace(/\/+$/, "");
-
 /** Shared placeholder for clients that never bind devices (`open` always throws). */
 const unboundRelayMux = createRelayMux();
 const unboundDevices: TClientDevices = {
@@ -96,7 +95,7 @@ export const createClient = (
     readonly devices?: TClientDevicesHost;
   },
 ): TOpenllmClient => {
-  const origin = normalizeOrigin(options.origin);
+  const origin = canonicalApiOrigin(options.origin);
   const vault = createClientVault({
     apiKey: options.apiKey,
     ...(options.dek !== undefined ? { dek: options.dek } : {}),

@@ -1,3 +1,5 @@
+import { canonicalApiOrigin } from "@openllmsh/sdk/protocol/canonical-origin";
+
 /** What your app needs, from the .env block OpenLLM showed you once. */
 export type TConnectConfig = {
   readonly clientId: string;
@@ -36,7 +38,8 @@ export const connectConfigFromEnv = (
     privateKey: need("OPENLLM_PRIVATE_KEY"),
     issuer: need("OPENLLM_ISSUER").replace(/\/+$/, ""),
     resource: env.OPENLLM_RESOURCE?.trim() || DEFAULT_CONNECT_RESOURCE,
-    apiOrigin: need("OPENLLM_API_ORIGIN").replace(/\/+$/, ""),
+    // The apex redirects to www and fetch drops auth on that hop.
+    apiOrigin: canonicalApiOrigin(need("OPENLLM_API_ORIGIN")),
     redirectUri: need("OPENLLM_REDIRECT_URI"),
   };
 };

@@ -67,7 +67,7 @@ The git tags here carry the TypeScript source instead, which Bun runs as is.
 import { createClient } from "@openllmsh/sdk/client";
 
 const ollm = createClient({
-  origin: "https://openllm.sh",
+  origin: "https://www.openllm.sh",
   apiKey, // sk-llm-…
   transport: { fetch, websocket: WebSocket },
 });

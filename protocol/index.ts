@@ -4,6 +4,7 @@ export * from "./agent-prompt-text";
 export * from "./api-key-syntax";
 export * from "./audio";
 export * from "./auth";
+export * from "./canonical-origin";
 export * from "./changelog";
 export * from "./chat";
 export * from "./client-origin";
