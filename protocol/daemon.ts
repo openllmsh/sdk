@@ -1,5 +1,6 @@
 import { Schema as S } from "effect";
 import { AuthSessionLostDiagnosticCode } from "./auth";
+import { CLIENT_HOST_MAX_LENGTH } from "./client-origin";
 import type { TContextOverflowStrategy } from "./config";
 import {
   ContextOverflowStrategy,
@@ -302,6 +303,16 @@ export const DaemonRecordRequest = S.Struct({
    *  Optional so daemons predating the field still record (the cloud
    *  stores null → the estimator's conservative null pool). */
   account_hash: S.optional(S.String),
+  /**
+   * Which client sent the request the daemon walked (`deriveClientOrigin`
+   * over the inbound headers), and a website's hostname. The cloud re-checks
+   * both (`normalizeClientOrigin`) before storing them on the row. Optional:
+   * daemons predating the fields record a NULL client.
+   */
+  client_kind: S.optional(S.String.check(S.isMaxLength(64))),
+  client_host: S.optional(
+    S.String.check(S.isMaxLength(CLIENT_HOST_MAX_LENGTH)),
+  ),
   /**
    * Origin-signed team grant echoed on team hops so the cloud attributes
    * the row to the consumer and settles `team_usage_counters`. Same-user

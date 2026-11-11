@@ -1,4 +1,5 @@
 import { Schema as S } from "effect";
+import { ClientKind } from "./client-origin";
 
 export const RequestStatus = S.Literals([
   "success",
@@ -50,6 +51,21 @@ export const ModelBreakdown = S.Struct({
   cost_usd: S.Number,
 });
 export type TModelBreakdown = S.Schema.Type<typeof ModelBreakdown>;
+
+/**
+ * One row of "where my requests came from": a client kind and, for a
+ * website, its host (`requests.client_kind` / `client_host`). `client` is
+ * null for rows recorded before the client was stored.
+ */
+export const ClientBreakdown = S.Struct({
+  client: S.NullOr(ClientKind),
+  host: S.NullOr(S.String),
+  requests: S.Number,
+  tokens_in: S.Number,
+  tokens_out: S.Number,
+  cost_usd: S.Number,
+});
+export type TClientBreakdown = S.Schema.Type<typeof ClientBreakdown>;
 
 export const DailyBucket = S.Struct({
   day: S.String,
@@ -236,6 +252,9 @@ export const UserStats = S.Struct({
    */
   inferred_subscription_usage: S.optional(S.Array(InferredProviderUsage)),
   by_model: S.Array(ModelBreakdown),
+  /** The window's requests by the client that sent them (overview Clients
+   *  tab), busiest first. */
+  by_client: S.Array(ClientBreakdown),
   daily: S.Array(DailyBucket),
 });
 export type TUserStats = S.Schema.Type<typeof UserStats>;

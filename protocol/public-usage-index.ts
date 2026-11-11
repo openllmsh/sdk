@@ -1,4 +1,5 @@
 import { Effect, Schema as S } from "effect";
+import { ClientKind } from "./client-origin";
 import { PROVIDER_TIER_METHODOLOGY_VERSION } from "./provider-tier";
 
 /**
@@ -21,6 +22,7 @@ export const PUBLIC_USAGE_VALUE_METHODOLOGY_VERSION =
 export const PublicUsageMetric = S.Literals([
   "model_popularity",
   "provider_popularity",
+  "client_popularity",
   "value",
 ]);
 export type TPublicUsageMetric = S.Schema.Type<typeof PublicUsageMetric>;
@@ -91,6 +93,11 @@ export const PublicUsageIndexStoredMetric = S.Union([
     metrics: PublicUsagePopularityMetrics,
   }),
   S.Struct({
+    metric: S.Literals(["client_popularity"]),
+    subject: S.String,
+    metrics: PublicUsagePopularityMetrics,
+  }),
+  S.Struct({
     metric: S.Literals(["value"]),
     subject: S.String,
     metrics: PublicUsageValueMetrics,
@@ -125,6 +132,12 @@ export const PublicUsageIndexRow = S.Union([
   S.Struct({
     ...PublicUsageIndexRowBase.fields,
     metric: S.Literals(["provider_popularity"]),
+    subject: S.String,
+    metrics: PublicUsagePopularityMetrics,
+  }),
+  S.Struct({
+    ...PublicUsageIndexRowBase.fields,
+    metric: S.Literals(["client_popularity"]),
     subject: S.String,
     metrics: PublicUsagePopularityMetrics,
   }),
@@ -217,6 +230,41 @@ export const PublicProviderPopularity = S.Struct({
 });
 export type TPublicProviderPopularity = S.Schema.Type<
   typeof PublicProviderPopularity
+>;
+
+/**
+ * Fewest distinct users a website needs before its hostname is published on
+ * the index. Below it the site's traffic still counts, folded into the
+ * unnamed "Other websites" row, so a single developer's own site is never
+ * named next to their usage.
+ */
+export const PUBLIC_CLIENT_HOST_MIN_USERS = 3;
+
+/**
+ * Where requests come from: one row per client kind (Claude Code, Codex, the
+ * desktop app, our website, …), plus one row per website host that clears
+ * {@link PUBLIC_CLIENT_HOST_MIN_USERS}. Measured over the model-popularity
+ * window (`windows.model`), the same successful-request ledger.
+ */
+export const PublicClientPopularity = S.Struct({
+  client: ClientKind,
+  /** A website's hostname; null on every non-website row and on the folded
+   *  "Other websites" row. */
+  host: S.NullOr(S.String),
+  /** Display name: the client's label, or the host. */
+  label: S.String,
+  users: S.Number,
+  user_days: S.Number,
+  requests: S.Number,
+  pct_change: S.NullOr(S.Number),
+  /** See `PublicModelPopularity.is_new`. */
+  is_new: S.Boolean.pipe(
+    S.optional,
+    S.withDecodingDefault(Effect.succeed(false)),
+  ),
+});
+export type TPublicClientPopularity = S.Schema.Type<
+  typeof PublicClientPopularity
 >;
 
 /**
@@ -337,6 +385,14 @@ export const PublicUsageIndexResponse = S.Struct({
   value_methodology_version: S.String,
   model_popularity: S.Array(PublicModelPopularity),
   provider_popularity: S.Array(PublicProviderPopularity),
+  /**
+   * Decoded with a default so a peer deployment that predates the field
+   * still merges — see the note on `PublicValueByTier`.
+   */
+  client_popularity: S.Array(PublicClientPopularity).pipe(
+    S.optional,
+    S.withDecodingDefault(Effect.succeed([])),
+  ),
   value_by_tier: S.Array(PublicValueByTier),
 });
 export type TPublicUsageIndexResponse = S.Schema.Type<
@@ -349,6 +405,7 @@ export function hasPublicUsageIndexData(
   return (
     response.model_popularity.length > 0 ||
     response.provider_popularity.length > 0 ||
+    (response.client_popularity?.length ?? 0) > 0 ||
     response.value_by_tier.length > 0
   );
 }

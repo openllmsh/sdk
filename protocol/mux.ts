@@ -9,6 +9,7 @@
 import { Schema as S } from "effect";
 import * as Result from "effect/Result";
 import { AgentStreamOpenPayload } from "./agent";
+import { CLIENT_HOST_MAX_LENGTH } from "./client-origin";
 import { HOP_GRANT_B64_MAX } from "./hop-grant";
 import {
   OPENLLM_CHAIN_HEADER,
@@ -61,6 +62,25 @@ export const TEAM_SERVE_CAP = "team_serve";
 /** Returns whether an open-vocabulary capability list advertises seedgate. */
 export const hasSeedgateCap = (caps: readonly string[] | undefined): boolean =>
   caps?.includes(SEEDGATE_CAP) ?? false;
+
+/**
+ * The serving daemon accepts `client_kind` / `client_host` on a tunnel OPEN's
+ * forward headers: the client origin already derived the request came from
+ * (a browser on our site or another website loses its `Origin` in the
+ * tunnel, so the daemon could not tell on its own). Daemons predating it
+ * refuse unknown header keys, so a consumer MUST check this before sending
+ * them and otherwise leave them off — the daemon then records what it can
+ * see (the forwarded user agent).
+ */
+export const CLIENT_ORIGIN_CAP = "client1";
+
+export const hasClientOriginCap = (
+  caps: Iterable<string> | undefined | null,
+): boolean => {
+  if (caps === undefined || caps === null) return false;
+  for (const cap of caps) if (cap === CLIENT_ORIGIN_CAP) return true;
+  return false;
+};
 
 /**
  * HTTP media over the existing mux `kind:"tunnel"` stream (STT / TTS / image
@@ -365,6 +385,16 @@ export const TunnelForwardHeaders = S.Struct({
   // Preserve whole flags; the mux codec bounds the complete OPEN payload.
   anthropic_beta: S.optional(S.String),
   user_agent: S.optional(S.String.check(S.isMaxLength(512))),
+  /**
+   * The client the consumer derived for this request (`TClientKind`) and a
+   * website's host. Sent only to a daemon advertising
+   * {@link CLIENT_ORIGIN_CAP}; a plain bounded string so a kind this daemon
+   * doesn't know yet never fails the OPEN — it is normalized at use.
+   */
+  client_kind: S.optional(S.String.check(S.isMaxLength(64))),
+  client_host: S.optional(
+    S.String.check(S.isMaxLength(CLIENT_HOST_MAX_LENGTH)),
+  ),
   /** Opaque video job id for GET retrieve/content mux follow-up. */
   video_id: S.optional(
     S.String.check(S.isMaxLength(256), S.isPattern(/^[A-Za-z0-9._-]+$/)),
@@ -700,6 +730,8 @@ export const parseStreamOpenPayload = (
       "anthropic_version",
       "anthropic_beta",
       "user_agent",
+      "client_kind",
+      "client_host",
       "media_persistence",
       "video_id",
       "team_grant",

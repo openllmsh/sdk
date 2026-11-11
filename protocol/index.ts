@@ -6,6 +6,7 @@ export * from "./audio";
 export * from "./auth";
 export * from "./changelog";
 export * from "./chat";
+export * from "./client-origin";
 export * from "./client-registry";
 export * from "./config";
 export * from "./control-channel";
