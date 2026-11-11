@@ -687,8 +687,9 @@ export const ExtendedModel = S.Struct({
   /**
    * Host-paid included models only: the monthly token allowance each plan
    * tier gets on OpenLLM's own key. Catalog-owned so a limit change ships
-   * with a catalog update. An included model also LEADS every default chain
-   * it belongs to (see `compareDefaultChainMembers`).
+   * with a catalog update. An included model TRAILS every default chain it
+   * belongs to (see `compareDefaultChainMembers`): the user's own
+   * subscriptions, local servers and keys answer first.
    */
   included_usage: S.optional(IncludedUsage),
   deprecated: S.optional(S.Boolean),
