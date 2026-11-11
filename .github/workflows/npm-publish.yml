@@ -73,6 +73,33 @@ jobs:
             echo "published=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # The source is TypeScript; npm gets compiled JS + .d.ts so plain Node
+      # works (Node refuses to strip types inside node_modules). The git tag and
+      # `github:` installs keep the source.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        if: steps.exists.outputs.published != 'true'
+        with:
+          bun-version: 1.4.4
+          no-cache: true
+
+      - name: Build for npm
+        if: steps.exists.outputs.published != 'true'
+        run: |
+          set -euo pipefail
+          npm install --no-package-lock --no-audit --no-fund
+          npm install --no-save --no-package-lock --no-audit --no-fund \
+            typescript@7.0.2 @types/node@24.19.2
+          bun scripts/build-npm.ts --tsc ./node_modules/.bin/tsc
+
+      # Install the packed tarball into an empty ESM project and import every
+      # subpath on plain Node. A broken build stops here, before npm.
+      - name: Smoke-test the package on Node
+        if: steps.exists.outputs.published != 'true'
+        run: |
+          set -euo pipefail
+          tarball="$(npm pack --silent --pack-destination "$RUNNER_TEMP")"
+          node scripts/smoke-npm.ts "$RUNNER_TEMP/${tarball}"
+
       # Trusted publishing (OIDC): npm trusts this repo + this workflow file, so
       # there is no token. Provenance is attached automatically.
       - name: Publish
@@ -86,5 +113,4 @@ jobs:
             echo "::error::npm ${npm_version} is too old for trusted publishing (needs >= 11.5.1)"
             exit 1
           fi
-          npm pack --dry-run
           npm publish --access public --tag "${DIST_TAG}"

@@ -11,7 +11,7 @@
   <a href="https://www.npmjs.com/package/@openllmsh/sdk"><img alt="npm" src="https://img.shields.io/npm/v/@openllmsh/sdk.svg"></a>
   <a href="https://www.npmjs.com/package/@openllmsh/sdk?activeTab=versions"><img alt="npm next" src="https://img.shields.io/npm/v/@openllmsh/sdk/next.svg?label=next"></a>
   <a href="https://github.com/openllmsh/sdk/blob/main/LICENSE"><img alt="License: Apache-2.0 AND BUSL-1.1" src="https://img.shields.io/badge/license-Apache--2.0%20%2B%20BUSL--1.1-blue.svg"></a>
-  <img alt="ships TypeScript source" src="https://img.shields.io/badge/ships-TypeScript%20source-black.svg">
+  <img alt="types included" src="https://img.shields.io/badge/types-included-blue.svg">
 </p>
 
 ---
@@ -28,7 +28,7 @@ under a single version.
   (Argon2id, AES-256-GCM, HKDF, X25519 seals) and zeroes key material on close.
 - **I/O injected, runs anywhere.** `client` and `mcp` take `fetch`, `WebSocket`
   and an RTC factory from the host, so the same code runs in the browser, in
-  Bun and in a bundled Node app.
+  Bun and in Node.
 - **One contract for HTTP and MCP.** `openapi` ships the public spec with a
   typed `callOperation()`; `mcp` derives its tools from the same operations.
 
@@ -49,15 +49,17 @@ the identical code.
 
 ### Runtimes
 
-The package ships its TypeScript source (no compiled JavaScript), so it needs a
-runtime or build step that reads `.ts`:
+ESM only. The npm package ships compiled JavaScript with type declarations, so
+it runs anywhere modern JavaScript does:
 
-| Where | Works |
+| Where | Notes |
 | --- | --- |
-| Bun | Yes, import it directly. |
-| A bundler: Vite, esbuild, webpack, Next.js, Rollup | Yes. Set `"moduleResolution": "Bundler"` in your `tsconfig.json`. |
-| Node, running the bundled output | Yes. |
-| Node, importing straight from `node_modules` | Not yet: Node refuses to strip types inside `node_modules`. Bundle your app first. |
+| Node 20.19+ / 22+ | `import` it from an ESM module (`"type": "module"` or `.mjs`). |
+| Bun | Import it directly. |
+| Browsers, via a bundler | Vite, esbuild, webpack, Next.js, Rollup. |
+| TypeScript | `"moduleResolution"` set to `NodeNext` or `Bundler`. |
+
+The git tags here carry the TypeScript source instead, which Bun runs as is.
 
 ## Quickstart
 
