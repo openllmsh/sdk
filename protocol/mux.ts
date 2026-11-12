@@ -419,6 +419,7 @@ export const TunnelForwardHeaders = S.Struct({
    * walking on to a later hop.
    */
   fleet_provider: S.optional(S.String.check(S.isMaxLength(64))),
+  fleet_model: S.optional(S.String.check(S.isMaxLength(256))),
 });
 export type TTunnelForwardHeaders = S.Schema.Type<typeof TunnelForwardHeaders>;
 
@@ -432,12 +433,14 @@ export const TUNNEL_CHAIN_MAX = 4096;
 
 /** Request header: the provider a fleet consumer wants this peer to serve. */
 export const FLEET_PROVIDER_HEADER = "x-openllm-fleet-provider";
+export const FLEET_MODEL_HEADER = "x-openllm-fleet-model";
 /** Response header: this peer can't serve the requested fleet provider. */
 export const FLEET_DECLINE_HEADER = "x-openllm-fleet-decline";
 export const FLEET_DECLINE_CAUSES = [
   "not_signed_in",
   "no_quota",
   "cooling",
+  "unavailable",
 ] as const;
 export type TFleetDeclineCause = (typeof FLEET_DECLINE_CAUSES)[number];
 export const isFleetDeclineCause = (
@@ -772,6 +775,7 @@ export const parseStreamOpenPayload = (
       "team_grant",
       "hop_grant",
       "fleet_provider",
+      "fleet_model",
     ])
   ) {
     return null;

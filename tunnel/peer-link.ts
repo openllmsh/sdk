@@ -227,6 +227,8 @@ export const peerLinkFailureCache = createPeerLinkFailureCache();
 export const peerLinkFailureReasonOf = (
   error: unknown,
 ): TPeerLinkFailureReason => {
+  if (error instanceof DOMException && error.name === "TimeoutError")
+    return "timeout";
   if (error instanceof DOMException && error.name === "AbortError") {
     return "aborted";
   }
@@ -250,7 +252,10 @@ export const createPeerLink = (options: TPeerLinkOptions): TPeerLink => {
   const rtcProbeMs =
     options.policy?.rtcProbeMs ?? Math.min(2_000, openBudgetMs);
   const idleTtlMs = options.policy?.idleTtlMs ?? PEER_LINK_DEFAULTS.idleTtlMs;
-  const classify = options.policy?.classifyFailure ?? peerLinkFailureReasonOf;
+  const classify = (error: unknown): TPeerLinkFailureReason =>
+    error instanceof DOMException && error.name === "TimeoutError"
+      ? "timeout"
+      : (options.policy?.classifyFailure ?? peerLinkFailureReasonOf)(error);
   // Retrying a dispatched inference can duplicate provider work. Callers must
   // prove that the failure happened before dispatch to opt into a fallback.
   const retrySafe = options.policy?.retrySafe ?? (() => false);
@@ -309,8 +314,8 @@ export const createPeerLink = (options: TPeerLinkOptions): TPeerLink => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timedOut = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
+        reject(new DOMException("Timed out", "TimeoutError"));
         controller.abort();
-        reject(new DOMException("Timed out", "AbortError"));
       }, timeoutMs);
     });
     try {
@@ -394,14 +399,16 @@ export const createPeerLink = (options: TPeerLinkOptions): TPeerLink => {
       if (resolved.path === "mux") {
         if (dialer?.drop === undefined) throw error;
         peerLinkFailureCache.clear(options.target, "mux");
-        const fresh = await channel();
-        if (
-          fresh === null ||
-          fresh.path !== "mux" ||
-          fresh.channel === resolved.channel
-        )
+        const startedAt = now();
+        let fresh: TMuxChannel | null;
+        try {
+          fresh = await dialWithin(options.mux, openBudgetMs);
+        } catch (dialError) {
+          cache("mux", dialError);
           throw error;
-        return fn(fresh);
+        }
+        if (fresh === null || fresh === resolved.channel) throw error;
+        return fn(resultOf("mux", options.mux, fresh, false, startedAt));
       }
       emit({
         type: "fallback",
