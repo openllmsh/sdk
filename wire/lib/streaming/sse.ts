@@ -709,14 +709,16 @@ export const withByteStreamDeadline = (
       timer = null;
     }
   };
+  // Leading `\n\n` resynchronises if the deadline fired mid-frame so the
+  // synthetic event always starts a fresh SSE record.
   const lengthTerminator = (): Uint8Array =>
     textEncoder.encode(
-      'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"max_tokens","stop_sequence":null},"usage":{"output_tokens":0}}\n\n' +
+      '\n\nevent: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"max_tokens","stop_sequence":null},"usage":{"output_tokens":0}}\n\n' +
         'event: message_stop\ndata: {"type":"message_stop"}\n\n',
     );
   const zeroOutputError = (): Uint8Array =>
     textEncoder.encode(
-      'event: error\ndata: {"type":"error","error":{"type":"upstream_stalled","message":"stream deadline reached with no output"}}\n\n',
+      '\n\nevent: error\ndata: {"type":"error","error":{"type":"upstream_stalled","message":"stream deadline reached with no output"}}\n\n',
     );
 
   const stream = new ReadableStream<Uint8Array>({

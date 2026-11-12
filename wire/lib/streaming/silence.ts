@@ -54,6 +54,17 @@ export const streamingHopNeedsSilence = (opts: {
   readonly clientWantsStream: boolean;
 }): boolean => opts.upstreamAlwaysStreams || opts.clientWantsStream;
 
+/**
+ * Absolute deadline for the combined headers + first-body-byte budget.
+ * Pass the remaining time into the body silence guard so the two waits
+ * share one first-byte window instead of stacking to ~2×.
+ */
+export const firstByteDeadlineAt = (firstByteTimeoutMs: number): number =>
+  Date.now() + Math.max(0, firstByteTimeoutMs);
+
+export const remainingTimeoutMs = (deadlineAt: number): number =>
+  Math.max(0, deadlineAt - Date.now());
+
 const STALL_ABORT_REASON = "openllm-upstream-stalled";
 
 export type TStreamingHeadersGuard = {

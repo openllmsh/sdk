@@ -84,22 +84,22 @@ export const reasonFor = (
   rules: readonly TProviderErrorRule[] = errorRulesFor(i.provider),
 ): TCooldownReason => {
   if (i.envelope?.error?.code === "content_filter") return "content_filter";
-  // Pre-commit streaming silence (headers wait or raw-byte gap before the
-  // first client-forwarded chunk). Checked before status buckets so a 502
-  // envelope carrying this code is not mis-tagged `server_error`.
+  // A 2xx the runner still couldn't use (an undecodable 200): the provider
+  // ACCEPTED the request and may have billed it, so walking on would send —
+  // and bill — it again. Only an explicit in-band refusal (content_filter,
+  // above) walks from a 2xx; no body matcher or provider rule — including a
+  // forged `upstream_stalled` code on an accepted response — may turn an
+  // accepted request into a walk.
+  if (i.status >= 200 && i.status < 300) return "accepted_unreadable";
+  // Pre-commit synthetic stall (headers / raw-byte silence). Our runners and
+  // the daemon emit this only on non-2xx outcomes (typically 504). Kept AFTER
+  // the 2xx guard so an accepted provider response can never be re-POSTed.
   if (
     i.envelope?.error?.code === "upstream_stalled" ||
     i.envelope?.error?.type === "upstream_stalled"
   ) {
     return "upstream_stalled";
   }
-  // A 2xx the runner still couldn't use (an undecodable 200): the provider
-  // ACCEPTED the request and may have billed it, so walking on would send —
-  // and bill — it again. Only an explicit in-band refusal (content_filter,
-  // above) walks from a 2xx; no body matcher or provider rule may turn an
-  // accepted request into a walk. 3xx falls through to the normal rules
-  // (typically `upstream_rejection` → walk).
-  if (i.status >= 200 && i.status < 300) return "accepted_unreadable";
   const message = i.envelope?.error?.message ?? "";
   if (CONTEXT_OVERFLOW_BODY.test(message)) return "context_overflow";
 
