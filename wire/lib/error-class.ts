@@ -84,6 +84,15 @@ export const reasonFor = (
   rules: readonly TProviderErrorRule[] = errorRulesFor(i.provider),
 ): TCooldownReason => {
   if (i.envelope?.error?.code === "content_filter") return "content_filter";
+  // Pre-commit streaming silence (headers wait or raw-byte gap before the
+  // first client-forwarded chunk). Checked before status buckets so a 502
+  // envelope carrying this code is not mis-tagged `server_error`.
+  if (
+    i.envelope?.error?.code === "upstream_stalled" ||
+    i.envelope?.error?.type === "upstream_stalled"
+  ) {
+    return "upstream_stalled";
+  }
   // A 2xx the runner still couldn't use (an undecodable 200): the provider
   // ACCEPTED the request and may have billed it, so walking on would send —
   // and bill — it again. Only an explicit in-band refusal (content_filter,

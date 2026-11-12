@@ -3,6 +3,7 @@ import type {
   THeartbeatOptions,
   TSseEvent,
 } from "@openllmsh/sdk/protocol";
+import { UpstreamStreamError } from "./upstream-error";
 
 const SSE_DONE = "[DONE]";
 
@@ -479,6 +480,29 @@ export const withFrameAlignedHeartbeat = (
  *
  * Wrap BEFORE `.tee()` so the usage-drain branch also terminates.
  */
+export type TStreamDeadlineTruncateInfo = {
+  /** True when at least one content / tool / reasoning delta was forwarded. */
+  readonly sawOutput: boolean;
+};
+
+const chunkHasOutputDelta = (chunk: TChatCompletionChunk): boolean => {
+  const nonEmpty = (s: string | null | undefined): boolean =>
+    typeof s === "string" && s.length > 0;
+  const nonEmptyArr = (a: ReadonlyArray<unknown> | null | undefined): boolean =>
+    Array.isArray(a) && a.length > 0;
+  return chunk.choices.some((choice) => {
+    const d = choice.delta;
+    return (
+      nonEmpty(d.content) ||
+      nonEmpty(d.reasoning_content) ||
+      nonEmpty(d.refusal) ||
+      nonEmptyArr(d.tool_calls) ||
+      nonEmptyArr(d.reasoning_items) ||
+      nonEmptyArr(d.server_search_calls)
+    );
+  });
+};
+
 export const withStreamDeadline = (
   source: ReadableStream<TChatCompletionChunk>,
   options: {
@@ -487,9 +511,10 @@ export const withStreamDeadline = (
      * Fires exactly once if the deadline expires before the source
      * closes naturally. Callers use this to skip caching a body that
      * was sealed by the synthetic terminator instead of the upstream's
-     * own `finish_reason`. Omit to ignore truncation.
+     * own `finish_reason`, and to log zero-output truncations as errors.
+     * Omit to ignore truncation.
      */
-    readonly onTruncate?: () => void;
+    readonly onTruncate?: (info: TStreamDeadlineTruncateInfo) => void;
   },
 ): ReadableStream<TChatCompletionChunk> => {
   const reader = source.getReader();
@@ -498,6 +523,7 @@ export const withStreamDeadline = (
   let lastCreated = 0;
   let hasCreated = false;
   let finished = false;
+  let sawOutput = false;
   const DEADLINE: unique symbol = Symbol("deadline");
   let timer: ReturnType<typeof setTimeout> | null = null;
   const deadline = new Promise<typeof DEADLINE>((resolve) => {
@@ -552,10 +578,22 @@ export const withStreamDeadline = (
         reader.cancel("openllm-stream-deadline").catch(() => {});
         if (options.onTruncate !== undefined) {
           try {
-            options.onTruncate();
+            options.onTruncate({ sawOutput });
           } catch {
             // Callback errors must not crash the stream.
           }
+        }
+        if (!sawOutput) {
+          // Zero-output deadline: a clean `length` turn would look like a
+          // successful empty answer and skip the fallback chain's chance to
+          // have walked (already committed). Surface a real error frame.
+          controller.error(
+            new UpstreamStreamError(
+              "upstream_stalled",
+              "stream deadline reached with no output",
+            ),
+          );
+          return;
         }
         controller.enqueue(terminal());
         controller.close();
@@ -568,6 +606,9 @@ export const withStreamDeadline = (
         return;
       }
       const value = r.value;
+      if (chunkHasOutputDelta(value)) {
+        sawOutput = true;
+      }
       if (typeof value.id === "string" && value.id.length > 0) {
         lastId = value.id;
       }
@@ -599,6 +640,20 @@ export const withStreamDeadline = (
 export type TByteStreamDeadlineHandle = {
   readonly stream: ReadableStream<Uint8Array>;
   readonly isTruncated: () => boolean;
+  /** True when the deadline fired with no non-keepalive output forwarded. */
+  readonly isZeroOutputTruncate: () => boolean;
+};
+
+const byteChunkLooksLikeOutput = (bytes: Uint8Array): boolean => {
+  // Keepalive comments (`: …`) and Anthropic `ping` events are not output.
+  // Anything else that reached the client counts as partial progress.
+  const text = new TextDecoder().decode(bytes);
+  if (text.length === 0) return false;
+  if (/^\s*(?::[^\n]*\n\n?)+$/.test(text)) return false;
+  if (/event:\s*ping\b/i.test(text) && !/content_block|message_delta|tool_use|text_delta/i.test(text)) {
+    return false;
+  }
+  return true;
 };
 
 /**
@@ -607,7 +662,7 @@ export type TByteStreamDeadlineHandle = {
  * the synthetic terminator must be a pre-encoded SSE byte sequence
  * because there is no canonical-decode step in the pipeline.
  *
- * On cutoff:
+ * On cutoff with partial output:
  *   1. cancel the source — propagating to the upstream `fetch` body
  *      so we stop paying the provider for tokens we'll never deliver;
  *   2. enqueue ONE pre-encoded `message_delta` + `message_stop` pair
@@ -615,6 +670,10 @@ export type TByteStreamDeadlineHandle = {
  *      adapter already emits for `finish_reason: "length"`);
  *   3. close cleanly so SSE clients see a terminated turn instead of
  *      a severed connection.
+ *
+ * On cutoff with ZERO output: emit an Anthropic `event: error` instead
+ * of a clean `max_tokens` turn, so the client and the usage log treat
+ * it as a failure.
  *
  * Wrap BEFORE `.tee()` so the usage-drain branch also receives the
  * terminator and the accumulator can finalise. The caller checks
@@ -633,6 +692,8 @@ export const withByteStreamDeadline = (
   const reader = source.getReader();
   let finished = false;
   let truncated = false;
+  let sawOutput = false;
+  let zeroOutputTruncate = false;
   const DEADLINE: unique symbol = Symbol("byte-stream-deadline");
   let timer: ReturnType<typeof setTimeout> | null = null;
   const deadline = new Promise<typeof DEADLINE>((resolve) => {
@@ -647,10 +708,14 @@ export const withByteStreamDeadline = (
       timer = null;
     }
   };
-  const terminator = (): Uint8Array =>
+  const lengthTerminator = (): Uint8Array =>
     textEncoder.encode(
       'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"max_tokens","stop_sequence":null},"usage":{"output_tokens":0}}\n\n' +
         'event: message_stop\ndata: {"type":"message_stop"}\n\n',
+    );
+  const zeroOutputError = (): Uint8Array =>
+    textEncoder.encode(
+      'event: error\ndata: {"type":"error","error":{"type":"upstream_stalled","message":"stream deadline reached with no output"}}\n\n',
     );
 
   const stream = new ReadableStream<Uint8Array>({
@@ -676,7 +741,12 @@ export const withByteStreamDeadline = (
         truncated = true;
         clear();
         reader.cancel("openllm-byte-stream-deadline").catch(() => {});
-        controller.enqueue(terminator());
+        if (!sawOutput) {
+          zeroOutputTruncate = true;
+          controller.enqueue(zeroOutputError());
+        } else {
+          controller.enqueue(lengthTerminator());
+        }
         controller.close();
         return;
       }
@@ -685,6 +755,9 @@ export const withByteStreamDeadline = (
         clear();
         controller.close();
         return;
+      }
+      if (byteChunkLooksLikeOutput(r.value)) {
+        sawOutput = true;
       }
       controller.enqueue(r.value);
     },
@@ -695,5 +768,9 @@ export const withByteStreamDeadline = (
     },
   });
 
-  return { stream, isTruncated: () => truncated };
+  return {
+    stream,
+    isTruncated: () => truncated,
+    isZeroOutputTruncate: () => zeroOutputTruncate,
+  };
 };
