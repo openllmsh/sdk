@@ -412,6 +412,14 @@ export const TunnelForwardHeaders = S.Struct({
    * bound to the key's cap hold. Uncapped keys omit it.
    */
   hop_grant: S.optional(S.String.check(S.isMaxLength(HOP_GRANT_B64_MAX))),
+  /**
+   * The subscription provider a fleet consumer could not serve itself and
+   * is asking this peer for. Mapped to {@link FLEET_PROVIDER_HEADER}; a peer
+   * that can't serve it answers with {@link FLEET_DECLINE_HEADER} instead of
+   * walking on to a later hop.
+   */
+  fleet_provider: S.optional(S.String.check(S.isMaxLength(64))),
+  fleet_model: S.optional(S.String.check(S.isMaxLength(256))),
 });
 export type TTunnelForwardHeaders = S.Schema.Type<typeof TunnelForwardHeaders>;
 
@@ -422,6 +430,24 @@ export type TTunnelForwardHeaders = S.Schema.Type<typeof TunnelForwardHeaders>;
  */
 export const TUNNEL_RESOLVED_MODEL_MAX = 256;
 export const TUNNEL_CHAIN_MAX = 4096;
+
+/** Request header: the provider a fleet consumer wants this peer to serve. */
+export const FLEET_PROVIDER_HEADER = "x-openllm-fleet-provider";
+export const FLEET_MODEL_HEADER = "x-openllm-fleet-model";
+/** Response header: this peer can't serve the requested fleet provider. */
+export const FLEET_DECLINE_HEADER = "x-openllm-fleet-decline";
+export const FLEET_DECLINE_CAUSES = [
+  "not_signed_in",
+  "no_quota",
+  "cooling",
+  "unavailable",
+] as const;
+export type TFleetDeclineCause = (typeof FLEET_DECLINE_CAUSES)[number];
+export const isFleetDeclineCause = (
+  value: string | null,
+): value is TFleetDeclineCause =>
+  value !== null &&
+  (FLEET_DECLINE_CAUSES as ReadonlyArray<string>).includes(value);
 
 export const TunnelResponseHeaders = S.Struct({
   media_url: S.optional(
@@ -438,6 +464,8 @@ export const TunnelResponseHeaders = S.Struct({
   ),
   /** Comma-separated attempted hops — maps to {@link OPENLLM_CHAIN_HEADER}. */
   chain: S.optional(S.String.check(S.isMaxLength(TUNNEL_CHAIN_MAX))),
+  /** Maps to {@link FLEET_DECLINE_HEADER}. */
+  fleet_decline: S.optional(S.Literals(FLEET_DECLINE_CAUSES)),
 });
 export type TTunnelResponseHeaders = S.Schema.Type<
   typeof TunnelResponseHeaders
@@ -475,6 +503,9 @@ export const applyTunnelResponseHeadersToHttp = (
   if (res.chain !== undefined) {
     headers.set(OPENLLM_CHAIN_HEADER, res.chain);
   }
+  if (res.fleet_decline !== undefined) {
+    headers.set(FLEET_DECLINE_HEADER, res.fleet_decline);
+  }
 };
 
 /** Project HTTP response headers onto the closed mux res_head struct. */
@@ -510,6 +541,13 @@ export const tunnelResponseHeadersFromHttp = (
     is_sse: contentType?.includes("text/event-stream") === true,
     ...(resolved === undefined ? {} : { resolved_model: resolved }),
     ...(chain === undefined ? {} : { chain }),
+    ...(isFleetDeclineCause(headers.get(FLEET_DECLINE_HEADER))
+      ? {
+          fleet_decline: headers.get(
+            FLEET_DECLINE_HEADER,
+          ) as TFleetDeclineCause,
+        }
+      : {}),
   };
 };
 
@@ -736,6 +774,8 @@ export const parseStreamOpenPayload = (
       "video_id",
       "team_grant",
       "hop_grant",
+      "fleet_provider",
+      "fleet_model",
     ])
   ) {
     return null;

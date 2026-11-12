@@ -1076,6 +1076,8 @@ export const DaemonProviderConnection = S.Struct({
   host_signed_in: S.optional(S.Boolean),
   detail: S.optional(S.String),
   last_login_at_ms: S.optional(S.NullOr(S.Number)),
+  /** Wall-clock time of the latest real provider status observation. */
+  last_probed_at_ms: S.optional(S.Number),
   /** A LIVE device-code flow awaiting the user (codex/kimi on a remote box):
    *  the verification URL + one-time code to surface so the dashboard can
    *  render a synced "open this link, enter this code" panel. Present only

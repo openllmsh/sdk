@@ -8,12 +8,17 @@ export const PEER_LINK_DEFAULTS = {
   rtcIceMs: 20_000,
   idleTtlMs: 90_000,
   failureTtlMs: 60_000,
+  presenceFailureTtlMs: 5_000,
 } as const;
 
 export type TPeerLinkPath = "rtc" | "mux";
 export type TPeerLinkRtcMode = "use-if-open+warm" | "probe";
 export type TPeerLinkFailureReason =
   | "aborted"
+  | "presence"
+  | "relay_unavailable"
+  | "timeout"
+  | "nack"
   | "not_capable"
   | "daemon_outdated"
   | "overloaded"
@@ -89,9 +94,10 @@ const failureTtlMs = (reason: TPeerLinkFailureReason): number => {
     case "overloaded":
     case "tunnel_busy":
       return 2_000;
+    case "presence":
     case "not_capable":
     case "daemon_outdated":
-      return 5_000;
+      return PEER_LINK_DEFAULTS.presenceFailureTtlMs;
     default:
       return PEER_LINK_DEFAULTS.failureTtlMs;
   }
@@ -107,6 +113,11 @@ export type TPeerLinkFailureCache = {
   /** Clear one transport's failures without erasing the independent rung. */
   readonly clearPath: (path: TPeerLinkPath) => void;
   readonly has: (target: string, path: TPeerLinkPath, now?: number) => boolean;
+  readonly reason: (
+    target: string,
+    path: TPeerLinkPath,
+    now?: number,
+  ) => TPeerLinkFailureReason | null;
   readonly until: (
     target: string,
     path: TPeerLinkPath,
@@ -126,11 +137,14 @@ export type TPeerLinkFailureCache = {
  * the process-global {@link peerLinkFailureCache}.
  */
 export const createPeerLinkFailureCache = (): TPeerLinkFailureCache => {
-  const failureCache = new Map<string, number>();
+  const failureCache = new Map<
+    string,
+    { until: number; reason: TPeerLinkFailureReason }
+  >();
 
   const sweepFailureCache = (now: number): void => {
-    for (const [key, until] of failureCache) {
-      if (until <= now) failureCache.delete(key);
+    for (const [key, entry] of failureCache) {
+      if (entry.until <= now) failureCache.delete(key);
     }
     while (failureCache.size > MAX_FAILURE_CACHE_ENTRIES) {
       const oldest = failureCache.keys().next().value;
@@ -162,9 +176,17 @@ export const createPeerLinkFailureCache = (): TPeerLinkFailureCache => {
       const key = cacheKeyOf(target, path);
       const until = failureCache.get(key);
       if (until === undefined) return false;
-      if (until > now) return true;
+      if (until.until > now) return true;
       failureCache.delete(key);
       return false;
+    },
+    reason(
+      target: string,
+      path: TPeerLinkPath,
+      now = Date.now(),
+    ): TPeerLinkFailureReason | null {
+      const entry = failureCache.get(cacheKeyOf(target, path));
+      return entry !== undefined && entry.until > now ? entry.reason : null;
     },
     until(
       target: string,
@@ -174,7 +196,7 @@ export const createPeerLinkFailureCache = (): TPeerLinkFailureCache => {
       const key = cacheKeyOf(target, path);
       const until = failureCache.get(key);
       if (until === undefined) return null;
-      if (until > now) return until;
+      if (until.until > now) return until.until;
       failureCache.delete(key);
       return null;
     },
@@ -189,7 +211,7 @@ export const createPeerLinkFailureCache = (): TPeerLinkFailureCache => {
       if (ttl > 0) {
         const key = cacheKeyOf(target, path);
         failureCache.delete(key);
-        failureCache.set(key, now + ttl);
+        failureCache.set(key, { until: now + ttl, reason });
         sweepFailureCache(now);
       }
     },
@@ -205,6 +227,8 @@ export const peerLinkFailureCache = createPeerLinkFailureCache();
 export const peerLinkFailureReasonOf = (
   error: unknown,
 ): TPeerLinkFailureReason => {
+  if (error instanceof DOMException && error.name === "TimeoutError")
+    return "timeout";
   if (error instanceof DOMException && error.name === "AbortError") {
     return "aborted";
   }
@@ -228,7 +252,10 @@ export const createPeerLink = (options: TPeerLinkOptions): TPeerLink => {
   const rtcProbeMs =
     options.policy?.rtcProbeMs ?? Math.min(2_000, openBudgetMs);
   const idleTtlMs = options.policy?.idleTtlMs ?? PEER_LINK_DEFAULTS.idleTtlMs;
-  const classify = options.policy?.classifyFailure ?? peerLinkFailureReasonOf;
+  const classify = (error: unknown): TPeerLinkFailureReason =>
+    error instanceof DOMException && error.name === "TimeoutError"
+      ? "timeout"
+      : (options.policy?.classifyFailure ?? peerLinkFailureReasonOf)(error);
   // Retrying a dispatched inference can duplicate provider work. Callers must
   // prove that the failure happened before dispatch to opt into a fallback.
   const retrySafe = options.policy?.retrySafe ?? (() => false);
@@ -287,8 +314,8 @@ export const createPeerLink = (options: TPeerLinkOptions): TPeerLink => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timedOut = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
+        reject(new DOMException("Timed out", "TimeoutError"));
         controller.abort();
-        reject(new DOMException("Timed out", "AbortError"));
       }, timeoutMs);
     });
     try {
@@ -369,7 +396,33 @@ export const createPeerLink = (options: TPeerLinkOptions): TPeerLink => {
       cache(resolved.path, error);
       const dialer = resolved.path === "rtc" ? options.rtc : options.mux;
       dialer?.drop?.(resolved.channel);
-      if (resolved.path !== "rtc") throw error;
+      if (resolved.path === "mux") {
+        if (dialer?.drop === undefined) throw error;
+        peerLinkFailureCache.clear(options.target, "mux");
+        const startedAt = now();
+        let fresh: TMuxChannel | null;
+        try {
+          fresh = await dialWithin(options.mux, openBudgetMs);
+        } catch (dialError) {
+          cache("mux", dialError);
+          throw error;
+        }
+        if (fresh === null || fresh === resolved.channel) throw error;
+        const reopened = fresh;
+        try {
+          return await fn(
+            resultOf("mux", options.mux, reopened, false, startedAt),
+          );
+        } catch (retryError) {
+          // One reopen only: a second pre-dispatch failure is cached and its
+          // channel dropped, so the next request honours the failure TTL.
+          if (retrySafe(retryError)) {
+            cache("mux", retryError);
+            dialer.drop(reopened);
+          }
+          throw retryError;
+        }
+      }
       emit({
         type: "fallback",
         path: "rtc",
