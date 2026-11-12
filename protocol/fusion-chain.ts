@@ -31,34 +31,6 @@ export function normalizeFusionCutoffs<T extends TFusionEntry>(
   });
 }
 
-/** Validate windows and effective cutoffs; the last step's cutoff is ignored. */
-export function validateFusionChain<T extends TFusionEntry>(
-  entries: readonly T[],
-  windowOf: TFusionWindowOf<T>,
-): string[] {
-  const errors: string[] = [];
-  let previousWindow = 0;
-  let previousCutoff = 0;
-  entries.forEach((entry, index) => {
-    const window = windowOf(entry);
-    if (window < previousWindow)
-      errors.push(
-        `Step ${index + 1} has a smaller window than the previous step`,
-      );
-    previousWindow = window;
-    if (index === entries.length - 1) return;
-    const cutoff = entry.cutoff_tokens ?? window;
-    if (!Number.isInteger(cutoff) || cutoff <= 0)
-      errors.push(`Step ${index + 1} cutoff must be a positive integer`);
-    if (cutoff > window)
-      errors.push(`Step ${index + 1} cutoff exceeds its window`);
-    if (cutoff < previousCutoff)
-      errors.push(`Step ${index + 1} cutoff is below the previous cutoff`);
-    previousCutoff = cutoff;
-  });
-  return errors;
-}
-
 /** Choose a starting step; an empty chain has no step and returns -1. */
 export function fusionStartIndex<T extends TFusionEntry>(
   entries: readonly T[],
