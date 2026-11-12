@@ -237,6 +237,14 @@ export const AGENT_MAX_ATTACHMENT_BYTES = Math.floor(
   (AGENT_MAX_ATTACHMENT_BASE64_LENGTH * 3) / 4,
 );
 
+/**
+ * Cap for a `path` attachment on this Mac (loopback only). The send carries
+ * no bytes, so {@link AGENT_MAX_ATTACHMENT_BYTES} doesn't apply; this bounds
+ * the daemon's read when the transcript previews it (`attachment_get`,
+ * chunked), so anything that can be sent can also be shown.
+ */
+export const AGENT_MAX_LOCAL_ATTACHMENT_BYTES = 64 * 1024 * 1024;
+
 /** Decision on an approval request (`request.opened`). */
 export const AgentRequestDecision = S.Literals([
   "accept",
