@@ -408,7 +408,20 @@ export const createPeerLink = (options: TPeerLinkOptions): TPeerLink => {
           throw error;
         }
         if (fresh === null || fresh === resolved.channel) throw error;
-        return fn(resultOf("mux", options.mux, fresh, false, startedAt));
+        const reopened = fresh;
+        try {
+          return await fn(
+            resultOf("mux", options.mux, reopened, false, startedAt),
+          );
+        } catch (retryError) {
+          // One reopen only: a second pre-dispatch failure is cached and its
+          // channel dropped, so the next request honours the failure TTL.
+          if (retrySafe(retryError)) {
+            cache("mux", retryError);
+            dialer.drop(reopened);
+          }
+          throw retryError;
+        }
       }
       emit({
         type: "fallback",
