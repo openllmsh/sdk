@@ -37980,19 +37980,6 @@
                         }
                       ]
                     },
-                    "client": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
                     "status": {
                       "type": "string",
                       "enum": [
