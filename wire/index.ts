@@ -36,7 +36,6 @@ export * from "./lib/refusal";
 export * from "./lib/secret-scrub";
 export * from "./lib/streaming/accumulate";
 export * from "./lib/streaming/peek";
-export * from "./lib/streaming/silence";
 export * from "./lib/streaming/sse";
 export * from "./lib/streaming/strip-tool-calls";
 export * from "./lib/streaming/upstream-error";

@@ -48,7 +48,6 @@ const MEDIA_NO_RETRY_REASONS: ReadonlySet<TCooldownReason> = new Set([
   "server_error",
   "timeout",
   "network",
-  "upstream_stalled",
 ]);
 
 /**

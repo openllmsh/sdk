@@ -64,16 +64,16 @@ export const isMeaningfulChunk = (chunk: TChatCompletionChunk): boolean => {
  * the module doc for why), then return a stream that replays what was
  * buffered ahead of the live tail.
  *
- * The wait for a MEANINGFUL decoded event is still unbounded here — the
- * request abort signal is the only hard stop at this layer. Raw-byte
- * silence is enforced BELOW the decoder by `withByteSilenceGuard` /
- * `withStreamingHeadersTimeout` (see `silence.ts`): a generous
- * first-byte budget (default 300s, `OPENLLM_STREAM_FIRST_BYTE_TIMEOUT_MS`)
- * covers near-cap prefills that produce no keepalive, and a shorter gap
- * budget (default 120s, `OPENLLM_STREAM_SILENCE_TIMEOUT_MS`) trips only
- * after the upstream has already spoken. That split keeps the overflow
- * peek working for long prefills without letting a truly silent hop
- * burn the Vercel deadline as a fake `length` success.
+ * The wait is UNBOUNDED by design — bounded only by the request's abort
+ * signal, which the upstream fetch carries (an aborted client errors the
+ * read). The rejection we're waiting for arrives after the vendor
+ * tokenizes the prompt, and a near-cap prompt (the exact overflow case)
+ * prefills for many seconds; any fixed deadline commits the response
+ * right before the rejection lands, stranding the client in a committed
+ * stream that then dies (the pre-fix stall). The client loses nothing
+ * from waiting: it would receive zero bytes before the first event
+ * regardless. (Same rule as ref/CLIProxyAPI's stream bootstrap: no
+ * timeouts after the upstream connection is established.)
  *
  * A stream that CLOSES before any event is an error by default (walkable
  * — the upstream produced nothing), not an empty success. EXCEPT when the
