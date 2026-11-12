@@ -3,6 +3,7 @@ import { Schema as S } from "effect";
 export const CooldownReason = S.Literals([
   "network",
   "timeout",
+  "upstream_stalled",
   "rate_limit",
   "quota_exhausted",
   "server_error",
@@ -51,6 +52,9 @@ export type TCooldownPolicy =
 const cooldownPolicies = {
   network: { action: "retry_in_place" },
   timeout: { action: "retry_in_place" },
+  // Streaming hop went silent before any client byte (headers or body). Cool
+  // briefly so a dead provider isn't retried immediately for the same turn.
+  upstream_stalled: { action: "cool_and_advance", ttlMs: 60_000 },
   rate_limit: { action: "cool_and_advance", ttlMs: 180_000 },
   quota_exhausted: { action: "cool_and_advance", ttlMs: 180_000 },
   server_error: { action: "retry_in_place" },

@@ -18,6 +18,19 @@ export class UpstreamStreamError extends Error {
 }
 
 /**
+ * A streaming hop went silent before any byte was forwarded to the client
+ * (headers wait or raw upstream inactivity). Distinct from a mid-stream
+ * decode error so the classifier can tag `upstream_stalled` and the
+ * fallback chain can walk while the hop is still uncommitted.
+ */
+export class UpstreamStalledError extends UpstreamStreamError {
+  constructor(message = "upstream stalled before producing output") {
+    super("upstream_stalled", message);
+    this.name = "UpstreamStalledError";
+  }
+}
+
+/**
  * A stream ended before a terminal chunk after its decoder had already observed
  * usage. The accumulator wraps every failure type, including transport errors,
  * so callers can retain that wire-observed usage without treating an incomplete
@@ -55,4 +68,13 @@ export const upstreamErrorFrom = (
     return { type: "stream_error", message: err.message };
   }
   return { type: "stream_error", message: String(err) };
+};
+
+/** True when `err` is (or wraps) an {@link UpstreamStalledError}. */
+export const isUpstreamStalledError = (err: unknown): boolean => {
+  if (err instanceof UpstreamStalledError) return true;
+  if (err instanceof Error && err.cause !== undefined) {
+    return isUpstreamStalledError(err.cause);
+  }
+  return false;
 };
