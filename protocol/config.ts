@@ -52,6 +52,8 @@ export type TCustomApiModelKind = S.Schema.Type<typeof CustomApiModelKind>;
 export const FallbackGroup = S.Struct({
   name: S.String,
   models: S.Array(S.String),
+  fusion: S.optional(S.Boolean),
+  cutoff_tokens: S.optional(S.Array(S.Int.check(S.isGreaterThan(0)))),
 });
 export type TFallbackGroup = S.Schema.Type<typeof FallbackGroup>;
 
