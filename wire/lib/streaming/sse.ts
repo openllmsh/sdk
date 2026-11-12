@@ -645,15 +645,16 @@ export type TByteStreamDeadlineHandle = {
 };
 
 const byteChunkLooksLikeOutput = (bytes: Uint8Array): boolean => {
-  // Keepalive comments (`: …`) and Anthropic `ping` events are not output.
-  // Anything else that reached the client counts as partial progress.
+  // Only content / tool / reasoning deltas count as partial output.
+  // Housekeeping (`message_start`, role-only frames) and keepalives must
+  // NOT flip a zero-output deadline into a clean `max_tokens` turn.
   const text = new TextDecoder().decode(bytes);
   if (text.length === 0) return false;
-  if (/^\s*(?::[^\n]*\n\n?)+$/.test(text)) return false;
-  if (/event:\s*ping\b/i.test(text) && !/content_block|message_delta|tool_use|text_delta/i.test(text)) {
-    return false;
-  }
-  return true;
+  return (
+    /text_delta|input_json_delta|thinking_delta|signature_delta|tool_use|reasoning_content|"content":"[^"]/i.test(
+      text,
+    )
+  );
 };
 
 /**

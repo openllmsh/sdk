@@ -1,47 +1,64 @@
 import { UpstreamStalledError } from "./upstream-error";
 
 /**
- * Pre-commit silence budget for STREAMING hops only.
+ * Pre-commit silence budgets for STREAMING hops only.
  *
- * Measures inactivity on raw upstream bytes (any byte resets the timer —
- * keepalive comments, pings, empty chunks, reasoning deltas). Applied to:
- *   1. waiting for response headers on a streaming fetch, and
- *   2. gaps between body bytes before the first chunk is forwarded to the
- *      client (`release()` disarms once the hop commits).
+ * Two clocks, both measured on raw upstream bytes (any enqueued chunk —
+ * including empty ones, keepalive comments, and pings — counts as alive):
+ *
+ *   1. **First-byte** (`OPENLLM_STREAM_FIRST_BYTE_TIMEOUT_MS`, default 300s)
+ *      — waiting for response headers, and the gap before the first body
+ *      byte. Near-cap prefills (hundreds of thousands of tokens) can
+ *      legitimately take minutes with no keepalive; this budget is the
+ *      one that must accommodate them. See `peek.ts`.
+ *   2. **Gap** (`OPENLLM_STREAM_SILENCE_TIMEOUT_MS`, default 120s) — after
+ *      any byte has arrived, until `release()` (hop commit). A provider
+ *      that went silent mid-prefill after talking once is treated as
+ *      stalled.
  *
  * Non-streaming requests get no short timeout — they legitimately send
- * nothing until the full JSON body is ready.
- *
- * Overridable via `OPENLLM_STREAM_SILENCE_TIMEOUT_MS` (same pattern as
- * `OPENLLM_STREAM_DEADLINE_MS`). A non-positive override disables the guard.
+ * nothing until the full JSON body is ready. A non-positive override
+ * disables that budget.
  */
+export const DEFAULT_STREAM_FIRST_BYTE_TIMEOUT_MS = 300_000;
 export const DEFAULT_STREAM_SILENCE_TIMEOUT_MS = 120_000;
 
-export const streamSilenceTimeoutMs = (): number => {
-  const raw = process.env.OPENLLM_STREAM_SILENCE_TIMEOUT_MS;
-  if (raw === undefined || raw === "") return DEFAULT_STREAM_SILENCE_TIMEOUT_MS;
+const readTimeoutMs = (envName: string, fallback: number): number => {
+  const raw = process.env[envName];
+  if (raw === undefined || raw === "") return fallback;
   const override = Number(raw);
-  if (!Number.isFinite(override)) return DEFAULT_STREAM_SILENCE_TIMEOUT_MS;
+  if (!Number.isFinite(override)) return fallback;
   return override;
 };
 
-const STALL_ABORT_REASON = "openllm-upstream-stalled";
+export const streamFirstByteTimeoutMs = (): number =>
+  readTimeoutMs(
+    "OPENLLM_STREAM_FIRST_BYTE_TIMEOUT_MS",
+    DEFAULT_STREAM_FIRST_BYTE_TIMEOUT_MS,
+  );
 
-export const isSilenceStallAbort = (err: unknown): boolean => {
-  if (err === STALL_ABORT_REASON) return true;
-  if (err instanceof Error) {
-    if (err.message === STALL_ABORT_REASON) return true;
-    if (err.cause !== undefined) return isSilenceStallAbort(err.cause);
-  }
-  if (typeof DOMException !== "undefined" && err instanceof DOMException) {
-    return err.message === STALL_ABORT_REASON || err.name === "TimeoutError";
-  }
-  return false;
-};
+export const streamSilenceTimeoutMs = (): number =>
+  readTimeoutMs(
+    "OPENLLM_STREAM_SILENCE_TIMEOUT_MS",
+    DEFAULT_STREAM_SILENCE_TIMEOUT_MS,
+  );
+
+/**
+ * Whether a hop should apply the streaming silence budgets on its
+ * upstream fetch. ChatGPT's Codex endpoint always streams even when the
+ * client asked for JSON, so the gate is `alwaysStreams || clientWantsStream`
+ * — not the client flag alone.
+ */
+export const streamingHopNeedsSilence = (opts: {
+  readonly upstreamAlwaysStreams: boolean;
+  readonly clientWantsStream: boolean;
+}): boolean => opts.upstreamAlwaysStreams || opts.clientWantsStream;
+
+const STALL_ABORT_REASON = "openllm-upstream-stalled";
 
 export type TStreamingHeadersGuard = {
   readonly signal: AbortSignal;
-  /** True when the silence headers timer fired and the caller did not abort. */
+  /** True when the first-byte headers timer fired and the caller did not abort. */
   readonly didStall: () => boolean;
   /** Clear the headers timer once the Response headers have arrived. */
   readonly clear: () => void;
@@ -49,14 +66,14 @@ export type TStreamingHeadersGuard = {
 
 /**
  * AbortSignal that fires if response headers take longer than
- * `silenceTimeoutMs`. Cleared as soon as headers arrive so it cannot
+ * `firstByteTimeoutMs`. Cleared as soon as headers arrive so it cannot
  * abort the body later. Caller abort still wins.
  */
 export const withStreamingHeadersTimeout = (
   caller: AbortSignal,
-  silenceTimeoutMs: number,
+  firstByteTimeoutMs: number,
 ): TStreamingHeadersGuard => {
-  if (!(silenceTimeoutMs > 0)) {
+  if (!(firstByteTimeoutMs > 0)) {
     return {
       signal: caller,
       didStall: () => false,
@@ -68,7 +85,7 @@ export const withStreamingHeadersTimeout = (
   const timer = setTimeout(() => {
     stalled = true;
     stall.abort(STALL_ABORT_REASON);
-  }, silenceTimeoutMs);
+  }, firstByteTimeoutMs);
   const clear = (): void => {
     clearTimeout(timer);
   };
@@ -102,27 +119,37 @@ export type TByteSilenceGuard = {
   readonly release: () => void;
 };
 
+export type TByteSilenceGuardOptions = {
+  /** Budget waiting for the first body byte (default 300s). */
+  readonly firstByteTimeoutMs: number;
+  /** Budget for gaps after any byte until `release()` (default 120s). */
+  readonly gapTimeoutMs: number;
+};
+
 /**
- * Wrap a raw upstream byte stream: any inactivity gap longer than
- * `silenceTimeoutMs` before `release()` errors the stream with
- * {@link UpstreamStalledError}. Any upstream byte resets the timer.
+ * Wrap a raw upstream byte stream with the two-budget silence policy.
+ * Errors the stream with {@link UpstreamStalledError} on a trip before
+ * `release()`.
  */
 export const withByteSilenceGuard = (
   source: ReadableStream<Uint8Array>,
-  options: {
-    readonly silenceTimeoutMs: number;
-  },
+  options: TByteSilenceGuardOptions,
 ): TByteSilenceGuard => {
-  if (!(options.silenceTimeoutMs > 0)) {
+  const firstMs = options.firstByteTimeoutMs;
+  const gapMs = options.gapTimeoutMs;
+  if (!(firstMs > 0) && !(gapMs > 0)) {
     return { stream: source, release: () => {} };
   }
   const reader = source.getReader();
   let released = false;
   let finished = false;
+  let sawByte = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
   const STALL: unique symbol = Symbol("upstream-silence");
-  let stallReject: ((reason: typeof STALL) => void) | null = null;
-  let stallPromise: Promise<typeof STALL> | null = null;
+  const RELEASED: unique symbol = Symbol("upstream-silence-released");
+  type TRace = typeof STALL | typeof RELEASED;
+  let settleRace: ((reason: TRace) => void) | null = null;
+  let racePromise: Promise<TRace> | null = null;
 
   const clearTimer = (): void => {
     if (timer !== null) {
@@ -131,23 +158,34 @@ export const withByteSilenceGuard = (
     }
   };
 
+  const currentBudgetMs = (): number => (sawByte ? gapMs : firstMs);
+
   const armTimer = (): void => {
     clearTimer();
     if (released || finished) return;
-    stallPromise = new Promise<typeof STALL>((resolve) => {
-      stallReject = resolve;
+    const budget = currentBudgetMs();
+    if (!(budget > 0)) {
+      racePromise = null;
+      settleRace = null;
+      return;
+    }
+    racePromise = new Promise<TRace>((resolve) => {
+      settleRace = resolve;
       timer = setTimeout(() => {
         timer = null;
         resolve(STALL);
-      }, options.silenceTimeoutMs);
+      }, budget);
     });
   };
 
   const release = (): void => {
     released = true;
     clearTimer();
-    stallReject = null;
-    stallPromise = null;
+    const settle = settleRace;
+    settleRace = null;
+    racePromise = null;
+    // Resolve any in-flight race so a late STALL is not observed as a stall.
+    if (settle !== null) settle(RELEASED);
   };
 
   armTimer();
@@ -171,27 +209,26 @@ export const withByteSilenceGuard = (
       }
       const read = reader.read();
       read.catch(() => {});
-      if (stallPromise === null) armTimer();
-      const race = stallPromise;
-      let result: Awaited<typeof read> | typeof STALL;
+      if (racePromise === null) armTimer();
+      const race = racePromise;
+      let result: Awaited<typeof read> | TRace;
       try {
-        result =
-          race === null
-            ? await read
-            : await Promise.race([read, race]);
+        result = race === null ? await read : await Promise.race([read, race]);
       } catch (err) {
         finished = true;
         clearTimer();
         throw err;
+      }
+      if (result === RELEASED || (result === STALL && released)) {
+        // Commit raced the timer: wait for the outstanding read without stalling.
+        result = await read;
       }
       if (result === STALL) {
         finished = true;
         clearTimer();
         reader.cancel(STALL_ABORT_REASON).catch(() => {});
         controller.error(
-          new UpstreamStalledError(
-            "upstream stalled before producing output",
-          ),
+          new UpstreamStalledError("upstream stalled before producing output"),
         );
         return;
       }
@@ -201,8 +238,9 @@ export const withByteSilenceGuard = (
         controller.close();
         return;
       }
-      // Any byte — keepalive comment, ping, empty chunk — counts as alive.
-      if (result.value.byteLength > 0 && !released) {
+      // Any enqueued chunk — including empty — counts as alive.
+      sawByte = true;
+      if (!released) {
         armTimer();
       }
       controller.enqueue(result.value);
@@ -217,7 +255,7 @@ export const withByteSilenceGuard = (
   return { stream, release };
 };
 
-/** Envelope used when a streaming headers wait stalls. */
+/** Envelope used when a streaming headers / body wait stalls. */
 export const upstreamStalledEnvelope = (
   message = "upstream stalled before producing output",
 ): {
@@ -233,3 +271,6 @@ export const upstreamStalledEnvelope = (
     code: "upstream_stalled",
   },
 });
+
+/** Shared HTTP status for a pre-commit upstream stall (cloud + daemon). */
+export const UPSTREAM_STALLED_HTTP_STATUS = 504;
