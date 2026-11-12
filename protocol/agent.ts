@@ -157,34 +157,42 @@ export type TAgentStreamOpenPayload = S.Schema.Type<
 /**
  * One attachment on `send`. Exactly one of `data` (base64, any transport) or
  * `path` (absolute local file, loopback agent socket only — the daemon rejects
- * `path` on mux/RTC).
+ * `path` on mux/RTC). Both together are refused (same XOR pattern as
+ * {@link AgentRespondCommand}).
  */
-export const AgentAttachment = S.Union([
-  S.Struct({
-    kind: S.Literals(["image", "file"]),
-    name: S.optional(S.String.check(S.isMinLength(1), S.isMaxLength(256))),
-    media_type: S.String.check(S.isMinLength(1), S.isMaxLength(128)),
-    /** Base64 bytes. */
-    data: S.String.check(S.isMaxLength(AGENT_MAX_ATTACHMENT_BASE64_LENGTH)),
-  }),
-  S.Struct({
-    kind: S.Literals(["image", "file"]),
-    name: S.optional(S.String.check(S.isMinLength(1), S.isMaxLength(256))),
-    media_type: S.String.check(S.isMinLength(1), S.isMaxLength(128)),
-    /** Absolute local path; admitted only on the desktop loopback agent socket. */
-    path: S.String.check(
+export const AgentAttachment = S.Struct({
+  kind: S.Literals(["image", "file"]),
+  name: S.optional(S.String.check(S.isMinLength(1), S.isMaxLength(256))),
+  media_type: S.String.check(S.isMinLength(1), S.isMaxLength(128)),
+  /** Base64 bytes. Mutually exclusive with {@link path}. */
+  data: S.optional(
+    S.String.check(S.isMaxLength(AGENT_MAX_ATTACHMENT_BASE64_LENGTH)),
+  ),
+  /** Absolute local path; admitted only on the desktop loopback agent socket. */
+  path: S.optional(
+    S.String.check(
       S.isMinLength(1),
       S.isMaxLength(AGENT_MAX_ATTACHMENT_PATH_LENGTH),
     ),
-  }),
-]);
+  ),
+}).check(
+  S.makeFilter(
+    (attachment) =>
+      (attachment.data === undefined) !== (attachment.path === undefined),
+    {
+      message: "attachment carries exactly one of data / path",
+    },
+  ),
+);
 export type TAgentAttachment = S.Schema.Type<typeof AgentAttachment>;
 
 /** True when the attachment carries an absolute local path instead of bytes. */
 export const agentAttachmentHasPath = (
   attachment: TAgentAttachment,
-): attachment is Extract<TAgentAttachment, { readonly path: string }> =>
-  "path" in attachment;
+): attachment is TAgentAttachment & {
+  readonly path: string;
+  readonly data?: undefined;
+} => typeof attachment.path === "string";
 
 /**
  * Metadata for an attachment that was saved on the device for a turn. The
