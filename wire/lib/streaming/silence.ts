@@ -59,13 +59,65 @@ export const streamingHopNeedsSilence = (opts: {
  * Pass the remaining time into the body silence guard so the two waits
  * share one first-byte window instead of stacking to ~2×.
  */
-export const firstByteDeadlineAt = (firstByteTimeoutMs: number): number =>
-  Date.now() + Math.max(0, firstByteTimeoutMs);
-
-export const remainingTimeoutMs = (deadlineAt: number): number =>
-  Math.max(0, deadlineAt - Date.now());
-
 const STALL_ABORT_REASON = "openllm-upstream-stalled";
+
+export const firstByteDeadlineAt = (
+  firstByteTimeoutMs: number,
+): number | null =>
+  firstByteTimeoutMs > 0 ? Date.now() + firstByteTimeoutMs : null;
+
+/**
+ * Time left before `deadlineAt`. `null` (no budget) returns 0, which every
+ * guard reads as disabled; an EXPIRED deadline returns 1 so the guard fires
+ * at once instead of being read as disabled.
+ */
+export const remainingTimeoutMs = (deadlineAt: number | null): number =>
+  deadlineAt === null ? 0 : Math.max(1, deadlineAt - Date.now());
+
+/**
+ * Read a (non-2xx) response body with `read`, failing with
+ * {@link UpstreamStalledError} if it takes longer than `timeoutMs`. The body
+ * is read through a reader this helper owns, so a stall can actually cancel
+ * it (a `text()` in flight locks the body, and `body.cancel()` would throw).
+ * `timeoutMs <= 0` disables the budget.
+ */
+export const readResponseWithin = async <T>(
+  response: Response,
+  timeoutMs: number,
+  read: (response: Response) => Promise<T>,
+): Promise<T> => {
+  if (!(timeoutMs > 0) || response.body === null) return read(response);
+  const reader = response.body.getReader();
+  const owned = new Response(
+    new ReadableStream<Uint8Array>({
+      pull: async (controller): Promise<void> => {
+        const next = await reader.read();
+        if (next.done) controller.close();
+        else controller.enqueue(next.value);
+      },
+      cancel: async (reason): Promise<void> => {
+        await reader.cancel(reason);
+      },
+    }),
+    {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    },
+  );
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const stalled = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reader.cancel(STALL_ABORT_REASON).catch(() => {});
+      reject(new UpstreamStalledError("upstream stalled reading error body"));
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([read(owned), stalled]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
 
 export type TStreamingHeadersGuard = {
   readonly signal: AbortSignal;
