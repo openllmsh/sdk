@@ -156,8 +156,9 @@ export type TAgentStreamOpenPayload = S.Schema.Type<
 
 /**
  * One attachment on `send`. Exactly one of `data` (base64, any transport) or
- * `path` (absolute local file, loopback agent socket only — the daemon rejects
- * `path` on mux/RTC). Both together are refused (same XOR pattern as
+ * `path` (an absolute file on the device, sent as a prompt mention on any
+ * transport; only the loopback socket reads its bytes back). Both together
+ * are refused (same XOR pattern as
  * {@link AgentRespondCommand}).
  */
 export const AgentAttachment = S.Struct({
@@ -168,7 +169,7 @@ export const AgentAttachment = S.Struct({
   data: S.optional(
     S.String.check(S.isMaxLength(AGENT_MAX_ATTACHMENT_BASE64_LENGTH)),
   ),
-  /** Absolute local path; admitted only on the desktop loopback agent socket. */
+  /** Absolute path on the device: a prompt mention, admitted on any transport. */
   path: S.optional(
     S.String.check(
       S.isMinLength(1),
