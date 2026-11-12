@@ -195,6 +195,30 @@ export const agentAttachmentHasPath = (
 } => typeof attachment.path === "string";
 
 /**
+ * Whether a path string can ride Claude's quoted `@"…"` mention: non-empty,
+ * within {@link AGENT_MAX_ATTACHMENT_PATH_LENGTH}, and free of `"`, C0/C1
+ * control characters and DEL. Syntax only: the daemon still requires an
+ * absolute path to a regular file, and checks the resolved path again.
+ */
+export const isAgentAttachmentMentionPath = (path: string): boolean => {
+  if (path.length === 0 || path.length > AGENT_MAX_ATTACHMENT_PATH_LENGTH) {
+    return false;
+  }
+  for (let i = 0; i < path.length; i += 1) {
+    const code = path.charCodeAt(i);
+    if (
+      code === 0x22 ||
+      code < 0x20 ||
+      code === 0x7f ||
+      (code >= 0x80 && code <= 0x9f)
+    ) {
+      return false;
+    }
+  }
+  return true;
+};
+
+/**
  * Metadata for an attachment that was saved on the device for a turn. The
  * `name` is the on-disk basename under the session's attachments dir (what
  * {@link AgentAttachmentGetCommand} looks up) — not the original upload name
