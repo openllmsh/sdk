@@ -83,6 +83,14 @@ export type TChatGptStreamState = {
       results: ReadonlyArray<{ url: string }>;
     }
   >;
+  /**
+   * Reasoning summary parts (`item_id:summary_index`) that streamed ≥1
+   * `reasoning_summary_text.delta`. Their `.done` repeats the whole part, so
+   * it is emitted only for a part that streamed nothing (done-only backends).
+   */
+  summaryPartsStreamed: Set<string>;
+  /** The summary part the last emitted reasoning text belonged to. */
+  lastSummaryPart: string | null;
   /** Present only when request encoding had to rewrite a client tool name. */
   readonly toolNameMap?: ReadonlyMap<string, string>;
 };
@@ -101,6 +109,8 @@ export const newChatGptStreamState = (
   toolNameEmittedIndexes: new Set(),
   emittedToolCallIds: new Set(),
   serverSearchById: new Map(),
+  summaryPartsStreamed: new Set(),
+  lastSummaryPart: null,
   ...(options.toolNameMap !== undefined && options.toolNameMap.size > 0
     ? { toolNameMap: options.toolNameMap }
     : {}),
@@ -651,11 +661,23 @@ export const chatGptEventToChunk = (
     type === "response.reasoning_summary_text.delta" ||
     type === "response.reasoning_summary_text.done"
   ) {
+    const isDone = type === "response.reasoning_summary_text.done";
+    const part = `${stringField(event, "item_id") ?? ""}:${numberField(event, "summary_index") ?? ""}`;
+    // `.done` repeats the part's full text: only a part that streamed no
+    // deltas (done-only backends) takes it, or the summary doubles.
+    if (isDone && state.summaryPartsStreamed.has(part)) return null;
+    const text = isDone
+      ? (stringField(event, "text") ?? stringField(event, "delta"))
+      : stringField(event, "delta");
+    if (text === undefined || text.length === 0) return null;
+    if (!isDone) state.summaryPartsStreamed.add(part);
+    // Each summary part opens with its own `**Title**` line; a paragraph
+    // break keeps it from running onto the previous part's last sentence.
     const delta =
-      type === "response.reasoning_summary_text.done"
-        ? (stringField(event, "text") ?? stringField(event, "delta"))
-        : stringField(event, "delta");
-    if (delta === undefined || delta.length === 0) return null;
+      state.lastSummaryPart !== null && state.lastSummaryPart !== part
+        ? `\n\n${text}`
+        : text;
+    state.lastSummaryPart = part;
     return {
       ...baseChunk(state, options),
       choices: [
