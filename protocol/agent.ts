@@ -321,6 +321,11 @@ export const AgentSendCommand = S.Struct({
   attachments: S.optional(
     S.Array(AgentAttachment).check(S.isMaxLength(AGENT_MAX_ATTACHMENTS)),
   ),
+  /**
+   * Mid-turn: queue this prompt and send now (Claude's ctrl+enter), as one
+   * command — so a refused send never interrupts for an older queued one.
+   */
+  send_now: S.optional(S.Boolean),
 }).check(
   S.makeFilter(
     (command) =>
@@ -659,6 +664,11 @@ export const AgentQueuedPrompt = S.Struct({
     S.isGreaterThanOrEqualTo(0),
     S.isLessThanOrEqualTo(AGENT_MAX_ATTACHMENTS),
   ),
+  /**
+   * Handed to the engine's own queue (Claude folds it in at the next tool
+   * boundary): no longer cancellable, but Send now still applies to it.
+   */
+  in_engine: S.optional(S.Boolean),
 });
 export type TAgentQueuedPrompt = S.Schema.Type<typeof AgentQueuedPrompt>;
 
