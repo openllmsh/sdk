@@ -1,7 +1,4 @@
 import { Schema as S } from "effect";
-
-/** The default loopback port for the daemon's `/v1/*` + `/whoami` surface. */
-export const DEFAULT_DAEMON_PORT = 8787;
 import { AuthSessionLostDiagnosticCode } from "./auth";
 import { CLIENT_HOST_MAX_LENGTH } from "./client-origin";
 import type { TContextOverflowStrategy } from "./config";

@@ -29,3 +29,8 @@ export const parseOpenllmDaemonPort = (
     ? parsed
     : fallback;
 };
+
+/** The default loopback port for the daemon's `/v1/*` + `/whoami` surface.
+ *  An import-free leaf so the CLI command code and the app share it without
+ *  loading the daemon contract graph (`./daemon`). */
+export const DEFAULT_DAEMON_PORT = 8787;
