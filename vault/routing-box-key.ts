@@ -1,3 +1,9 @@
+/**
+ * Deliberately NOT re-exported from `vault/index.ts`: the `openllm` binary
+ * imports that barrel, and a routing box only ever receives this key, so
+ * keeping it out keeps the binary unchanged. Import it by subpath:
+ * `@openllmsh/sdk/vault/routing-box-key`.
+ */
 import { hkdfSha256 } from "./crypto";
 import { SEED_BYTES } from "./seed";
 
