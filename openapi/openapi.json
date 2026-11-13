@@ -23195,6 +23195,13 @@
                             },
                             "additionalProperties": false
                           },
+                          "management_kind": {
+                            "type": "string",
+                            "enum": [
+                              "user",
+                              "routing_sandbox"
+                            ]
+                          },
                           "usage": {
                             "type": "object",
                             "properties": {
@@ -23240,6 +23247,7 @@
                           "device_access_provisioned",
                           "device_access_pubkey",
                           "policy",
+                          "management_kind",
                           "usage"
                         ],
                         "additionalProperties": false
@@ -26309,6 +26317,13 @@
                       },
                       "additionalProperties": false
                     },
+                    "management_kind": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "routing_sandbox"
+                      ]
+                    },
                     "usage": {
                       "type": "object",
                       "properties": {
@@ -26354,6 +26369,7 @@
                     "device_access_provisioned",
                     "device_access_pubkey",
                     "policy",
+                    "management_kind",
                     "usage"
                   ],
                   "additionalProperties": false
