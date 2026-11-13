@@ -4,7 +4,11 @@ import type {
   TImageEditParseResult,
   TImageEditRequest,
 } from "./images";
-import { decodeImageEditRequest, IMAGE_EDIT_MAX_BODY_BYTES } from "./images";
+import {
+  decodeImageEditRequest,
+  IMAGE_EDIT_MAX_BODY_BYTES,
+  IMAGE_EDIT_MAX_REFERENCES,
+} from "./images";
 
 const asRecord = (value: unknown): Record<string, unknown> | null => {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
@@ -22,16 +26,6 @@ const isPresent = (value: unknown): boolean => {
   if (value === undefined || value === null) return false;
   if (typeof value === "string" && value.trim() === "") return false;
   return true;
-};
-
-const referenceCount = (body: Record<string, unknown>): number => {
-  let count = 0;
-  if (isPresent(body.image)) {
-    if (Array.isArray(body.image)) count += body.image.length;
-    else count += 1;
-  }
-  if (Array.isArray(body.images)) count += body.images.length;
-  return count;
 };
 
 // Strict `data:[<mime>][;charset=<x>];base64,<payload>` matcher. The base64
@@ -60,30 +54,45 @@ const estimateDataUrlBytes = (url: string): number | null => {
   return (base64.length / 4) * 3 - padding;
 };
 
-const referenceUrl = (body: Record<string, unknown>): string | null => {
-  const image = body.image;
-  if (typeof image === "string" && image.length > 0) return image;
-  const imageObj = asRecord(image);
-  if (imageObj !== null) {
-    if (typeof imageObj.url === "string") return imageObj.url;
-    if (typeof imageObj.image_url === "string") return imageObj.image_url;
-  }
-  const images = body.images;
-  if (Array.isArray(images) && images.length === 1) {
-    const first = asRecord(images[0]);
-    if (first !== null) {
-      if (typeof first.image_url === "string") return first.image_url;
-      if (typeof first.url === "string") return first.url;
-    }
-    if (typeof images[0] === "string") return images[0];
+const referenceItemUrl = (item: unknown): string | null => {
+  if (typeof item === "string") return item.length > 0 ? item : null;
+  const obj = asRecord(item);
+  if (obj === null) return null;
+  if (typeof obj.url === "string" && obj.url.length > 0) return obj.url;
+  if (typeof obj.image_url === "string" && obj.image_url.length > 0) {
+    return obj.image_url;
   }
   return null;
 };
 
 /**
+ * Every reference image in the body, in order: `image` (one, or an array,
+ * the JSON form of multipart `image[]`) then `images`. `null` when any
+ * present entry is not a usable reference — a bad entry fails the request
+ * rather than being dropped.
+ */
+const referenceUrls = (
+  body: Record<string, unknown>,
+): ReadonlyArray<string> | null => {
+  const items: unknown[] = [];
+  for (const value of [body.image, body.images]) {
+    if (!isPresent(value)) continue;
+    if (Array.isArray(value)) items.push(...value);
+    else items.push(value);
+  }
+  const urls: string[] = [];
+  for (const item of items) {
+    const url = referenceItemUrl(item);
+    if (url === null) return null;
+    urls.push(url);
+  }
+  return urls;
+};
+
+/**
  * Normalize documented multipart fields and a narrow JSON convenience into
- * the canonical single-image {@link TImageEditRequest}. Masks and extra
- * references fail explicitly — they are never dropped.
+ * the canonical {@link TImageEditRequest} with one or more references.
+ * Masks fail explicitly — they are never dropped.
  */
 export const parseImageEditInput = (raw: unknown): TImageEditParseResult => {
   const body = asRecord(raw);
@@ -105,40 +114,42 @@ export const parseImageEditInput = (raw: unknown): TImageEditParseResult => {
     );
   }
 
-  const count = referenceCount(body);
-  if (count > 1) {
+  const urls = referenceUrls(body);
+  if (urls === null || urls.length === 0) {
     return fail(
-      "image_edit_multi_reference_unsupported",
-      "Image edits accept exactly one reference image.",
+      "image_edit_invalid",
+      "Image edits require at least one reference image.",
+    );
+  }
+  if (urls.length > IMAGE_EDIT_MAX_REFERENCES) {
+    return fail(
+      "image_edit_invalid",
+      `Image edits accept at most ${IMAGE_EDIT_MAX_REFERENCES} reference images.`,
     );
   }
 
-  const url = referenceUrl(body);
-  if (url === null) {
-    return fail(
-      "image_edit_invalid",
-      "Image edits require exactly one reference image.",
-    );
+  let totalBytes = 0;
+  for (const url of urls) {
+    const dataUrlBytes = estimateDataUrlBytes(url);
+    if (dataUrlBytes === null) {
+      return fail(
+        "image_edit_invalid",
+        "Image edit reference is not a valid base64 data URL.",
+      );
+    }
+    totalBytes += dataUrlBytes;
   }
-
-  const dataUrlBytes = estimateDataUrlBytes(url);
-  if (dataUrlBytes === null) {
+  if (totalBytes > IMAGE_EDIT_MAX_BODY_BYTES) {
     return fail(
       "image_edit_invalid",
-      "Image edit reference is not a valid base64 data URL.",
-    );
-  }
-  if (dataUrlBytes > IMAGE_EDIT_MAX_BODY_BYTES) {
-    return fail(
-      "image_edit_invalid",
-      `Image edit reference exceeds ${IMAGE_EDIT_MAX_BODY_BYTES} bytes.`,
+      `Image edit references exceed ${IMAGE_EDIT_MAX_BODY_BYTES} bytes.`,
     );
   }
 
   const candidate: Record<string, unknown> = {
     model: body.model,
     prompt: body.prompt,
-    image: { url },
+    images: urls.map((url) => ({ url })),
   };
   if (body.n !== undefined) candidate.n = body.n;
   if (body.size !== undefined) candidate.size = body.size;
@@ -201,15 +212,26 @@ const parseMultipartNField = (raw: string): number | null =>
   POSITIVE_INTEGER_FIELD_PATTERN.test(raw) ? Number(raw) : null;
 
 /**
- * Map OpenAI-style multipart edits (`image` file + string fields) onto the
+ * Multipart field names that carry a reference image: OpenAI's `image` /
+ * `image[]` (repeat the part once per image), plus the `images` spelling.
+ */
+export const IMAGE_EDIT_MULTIPART_IMAGE_FIELDS: ReadonlySet<string> = new Set([
+  "image",
+  "image[]",
+  "images",
+  "images[]",
+]);
+
+/**
+ * Map OpenAI-style multipart edits (`image` / `image[]` files + string fields) onto the
  * same canonical parser as JSON.
  */
 export const parseImageEditMultipart = (input: {
   readonly fields: Readonly<Record<string, string>>;
   readonly files: ReadonlyArray<TImageEditMultipartFile>;
 }): TImageEditParseResult => {
-  const imageFiles = input.files.filter(
-    (file) => file.fieldName === "image" || file.fieldName === "images",
+  const imageFiles = input.files.filter((file) =>
+    IMAGE_EDIT_MULTIPART_IMAGE_FIELDS.has(file.fieldName),
   );
   const maskFiles = input.files.filter((file) => file.fieldName === "mask");
   if (maskFiles.length > 0 || isPresent(input.fields.mask)) {
@@ -218,31 +240,27 @@ export const parseImageEditMultipart = (input: {
       "Image edit masks are not supported.",
     );
   }
-  if (imageFiles.length > 1) {
+  // Image FILES together with an inline `image`/`images` string field mix
+  // two ways of sending references with no defined order between them —
+  // reject explicitly rather than silently letting the files win.
+  const inlineFields = [...IMAGE_EDIT_MULTIPART_IMAGE_FIELDS].filter((name) =>
+    isPresent(input.fields[name]),
+  );
+  if (imageFiles.length > 0 && inlineFields.length > 0) {
     return fail(
-      "image_edit_multi_reference_unsupported",
-      "Image edits accept exactly one reference image.",
-    );
-  }
-  // A file field AND an inline `image`/`images` string field together are an
-  // ambiguous duplicate reference (which one wins?) — reject explicitly
-  // rather than silently letting the file overwrite the string field below.
-  if (
-    imageFiles.length === 1 &&
-    (isPresent(input.fields.image) || isPresent(input.fields.images))
-  ) {
-    return fail(
-      "image_edit_multi_reference_unsupported",
-      "Image edits accept exactly one reference image; do not combine an image file with an inline image field.",
+      "image_edit_invalid",
+      "Send reference images either as files or as inline image fields, not both.",
     );
   }
 
   const raw: Record<string, unknown> = { ...input.fields };
-  if (imageFiles.length === 1) {
-    const file = imageFiles[0];
-    if (file !== undefined) {
-      raw.image = bytesToDataUrl(file.bytes, file.contentType);
-    }
+  for (const name of IMAGE_EDIT_MULTIPART_IMAGE_FIELDS) delete raw[name];
+  if (imageFiles.length > 0) {
+    raw.image = imageFiles.map((file) =>
+      bytesToDataUrl(file.bytes, file.contentType),
+    );
+  } else {
+    raw.image = inlineFields.map((name) => input.fields[name]);
   }
   if (typeof input.fields.n === "string") {
     const n = parseMultipartNField(input.fields.n);

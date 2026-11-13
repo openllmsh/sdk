@@ -249,9 +249,16 @@ export const imageStreamEventName = (event: TImageStreamEvent): string =>
   event.type;
 
 /**
- * Canonical single-reference image edit. Generation (`ImageGenerationRequest`)
- * must not be used as a silent stand-in — edits require an explicit image
- * and reject masks / extra references.
+ * Most reference images one edit may carry (OpenAI's `image[]` limit for
+ * gpt-image models). Their combined decoded size still fits
+ * {@link IMAGE_EDIT_MAX_BODY_BYTES}.
+ */
+export const IMAGE_EDIT_MAX_REFERENCES = 16;
+
+/**
+ * Canonical image edit: one or more reference images, in the caller's order.
+ * Generation (`ImageGenerationRequest`) must not be used as a silent
+ * stand-in — edits require an explicit image and reject masks.
  */
 export const ImageEditReference = S.Struct({
   url: S.String,
@@ -261,7 +268,7 @@ export type TImageEditReference = S.Schema.Type<typeof ImageEditReference>;
 export const ImageEditRequest = S.Struct({
   model: S.String,
   prompt: S.String,
-  image: ImageEditReference,
+  images: S.NonEmptyArray(ImageEditReference),
   n: S.optional(S.Int.check(S.isGreaterThan(0))),
   size: S.optional(ImageSize),
   quality: S.optional(S.String),
@@ -279,7 +286,6 @@ export type TImageEditInput = S.Schema.Type<typeof ImageEditInput>;
 
 export const ImageEditParseErrorCode = S.Literals([
   "image_edit_mask_unsupported",
-  "image_edit_multi_reference_unsupported",
   "image_edit_invalid",
 ]);
 export type TImageEditParseErrorCode = S.Schema.Type<
