@@ -74,13 +74,20 @@ export const AGENT_HOOK_EVENTS = [
   "PreToolUse",
   "Stop",
   "SessionStart",
+  "UserPromptSubmit",
 ] as const;
 
 /** Max inline attachments on one `send`. */
 export const AGENT_MAX_ATTACHMENTS = 8;
 
-/** Max base64 characters of one inline attachment. */
+/** Max base64 characters of one `attachment.data` chunk. */
 export const AGENT_MAX_ATTACHMENT_BASE64_LENGTH = 6 * 1024 * 1024;
+
+/**
+ * Decoded bytes of one `attachment_put` chunk. Small enough that a chunk
+ * never crowds the stream; each one is acknowledged before the next.
+ */
+export const AGENT_ATTACHMENT_PUT_CHUNK_BYTES = 1024 * 1024;
 
 /**
  * Max characters of one absolute local-path attachment (same bound as a
@@ -154,21 +161,27 @@ export type TAgentStreamOpenPayload = S.Schema.Type<
 // Commands (consumer → daemon)
 // ---------------------------------------------------------------------------
 
+/** A cached attachment's id: the lowercase hex SHA-256 of its bytes. */
+export const AGENT_ATTACHMENT_SHA256_PATTERN = /^[0-9a-f]{64}$/;
+
+export const AgentAttachmentSha256 = S.String.check(
+  S.isPattern(AGENT_ATTACHMENT_SHA256_PATTERN),
+);
+
 /**
- * One attachment on `send`. Exactly one of `data` (base64, any transport) or
- * `path` (absolute local file, loopback agent socket only — the daemon rejects
- * `path` on mux/RTC). Both together are refused (same XOR pattern as
- * {@link AgentRespondCommand}).
+ * One attachment on `send`. Exactly one of `sha256` (bytes the consumer put
+ * into the device's attachment cache with {@link AgentAttachmentPutCommand},
+ * any transport) or `path` (an absolute file on the device, sent as a plain
+ * path in the prompt on any transport; only the loopback socket reads its
+ * bytes back). Both together are refused.
  */
 export const AgentAttachment = S.Struct({
   kind: S.Literals(["image", "file"]),
   name: S.optional(S.String.check(S.isMinLength(1), S.isMaxLength(256))),
   media_type: S.String.check(S.isMinLength(1), S.isMaxLength(128)),
-  /** Base64 bytes. Mutually exclusive with {@link path}. */
-  data: S.optional(
-    S.String.check(S.isMaxLength(AGENT_MAX_ATTACHMENT_BASE64_LENGTH)),
-  ),
-  /** Absolute local path; admitted only on the desktop loopback agent socket. */
+  /** A cached upload. Mutually exclusive with {@link path}. */
+  sha256: S.optional(AgentAttachmentSha256),
+  /** Absolute path on the device, admitted on any transport. */
   path: S.optional(
     S.String.check(
       S.isMinLength(1),
@@ -178,20 +191,20 @@ export const AgentAttachment = S.Struct({
 }).check(
   S.makeFilter(
     (attachment) =>
-      (attachment.data === undefined) !== (attachment.path === undefined),
+      (attachment.sha256 === undefined) !== (attachment.path === undefined),
     {
-      message: "attachment carries exactly one of data / path",
+      message: "attachment carries exactly one of sha256 / path",
     },
   ),
 );
 export type TAgentAttachment = S.Schema.Type<typeof AgentAttachment>;
 
-/** True when the attachment carries an absolute local path instead of bytes. */
+/** True when the attachment names a file on the device instead of a cached upload. */
 export const agentAttachmentHasPath = (
   attachment: TAgentAttachment,
 ): attachment is TAgentAttachment & {
   readonly path: string;
-  readonly data?: undefined;
+  readonly sha256?: undefined;
 } => typeof attachment.path === "string";
 
 /**
@@ -232,18 +245,13 @@ export const AgentAttachmentMeta = S.Struct({
 });
 export type TAgentAttachmentMeta = S.Schema.Type<typeof AgentAttachmentMeta>;
 
-/** Decoded-byte cap mirroring {@link AGENT_MAX_ATTACHMENT_BASE64_LENGTH}. */
-export const AGENT_MAX_ATTACHMENT_BYTES = Math.floor(
-  (AGENT_MAX_ATTACHMENT_BASE64_LENGTH * 3) / 4,
-);
-
 /**
- * Cap for a `path` attachment on this Mac (loopback only). The send carries
- * no bytes, so {@link AGENT_MAX_ATTACHMENT_BYTES} doesn't apply; this bounds
- * the daemon's read when the transcript previews it (`attachment_get`,
- * chunked), so anything that can be sent can also be shown.
+ * Max bytes of one attachment, a cached upload or a path on the device alike.
+ * Uploads travel in {@link AGENT_ATTACHMENT_PUT_CHUNK_BYTES} chunks and
+ * previews come back chunked (`attachment_get`), so no single message carries
+ * a whole file.
  */
-export const AGENT_MAX_LOCAL_ATTACHMENT_BYTES = 64 * 1024 * 1024;
+export const AGENT_MAX_ATTACHMENT_BYTES = 64 * 1024 * 1024;
 
 /** Decision on an approval request (`request.opened`). */
 export const AgentRequestDecision = S.Literals([
@@ -313,6 +321,11 @@ export const AgentSendCommand = S.Struct({
   attachments: S.optional(
     S.Array(AgentAttachment).check(S.isMaxLength(AGENT_MAX_ATTACHMENTS)),
   ),
+  /**
+   * Mid-turn: queue this prompt and send now (Claude's ctrl+enter), as one
+   * command — so a refused send never interrupts for an older queued one.
+   */
+  send_now: S.optional(S.Boolean),
 }).check(
   S.makeFilter(
     (command) =>
@@ -412,6 +425,36 @@ export type TAgentAttachmentGetCommand = S.Schema.Type<
 >;
 
 /**
+ * Put one chunk of an attachment into the device's attachment cache, keyed by
+ * the SHA-256 of the whole file. Chunks go in order from offset 0, each
+ * acknowledged by an {@link AgentAttachmentStatusEvent} before the next; the
+ * file is stored once `done` and its hash and size check out. A first chunk
+ * with empty `data` asks whether the file is already cached (the reply says
+ * `stored`), so a file is never sent twice. Any transport: these are the
+ * consumer's own bytes, never a file the device already had.
+ */
+export const AgentAttachmentPutCommand = S.Struct({
+  type: S.Literal("attachment_put"),
+  id: S.optional(AgentCommandId),
+  sha256: AgentAttachmentSha256,
+  /** Total bytes of the file. */
+  size: S.Number.check(
+    S.isInt(),
+    S.isGreaterThanOrEqualTo(0),
+    S.isLessThanOrEqualTo(AGENT_MAX_ATTACHMENT_BYTES),
+  ),
+  /** Decoded-byte offset of this chunk. */
+  offset: S.Number.check(S.isInt(), S.isGreaterThanOrEqualTo(0)),
+  /** Base64 of this chunk (at most {@link AGENT_ATTACHMENT_PUT_CHUNK_BYTES}). */
+  data: S.String.check(S.isMaxLength(AGENT_MAX_ATTACHMENT_BASE64_LENGTH)),
+  /** This chunk ends the file. */
+  done: S.Boolean,
+});
+export type TAgentAttachmentPutCommand = S.Schema.Type<
+  typeof AgentAttachmentPutCommand
+>;
+
+/**
  * A model id a running session can switch to: gateway ids and Claude aliases
  * (`ultra`, `sonnet`, `openai/gpt-5`, `claude-opus-4-5[1m]`). No whitespace or
  * control characters: it is typed into the engine's own `/model` command.
@@ -482,6 +525,7 @@ export const AgentCommand = S.Union([
   AgentStartCommand,
   AgentAttachCommand,
   AgentSendCommand,
+  AgentAttachmentPutCommand,
   AgentSendNowCommand,
   AgentResumeQueueCommand,
   AgentCancelQueuedCommand,
@@ -620,6 +664,11 @@ export const AgentQueuedPrompt = S.Struct({
     S.isGreaterThanOrEqualTo(0),
     S.isLessThanOrEqualTo(AGENT_MAX_ATTACHMENTS),
   ),
+  /**
+   * Handed to the engine's own queue (Claude folds it in at the next tool
+   * boundary): no longer cancellable, but Send now still applies to it.
+   */
+  in_engine: S.optional(S.Boolean),
 });
 export type TAgentQueuedPrompt = S.Schema.Type<typeof AgentQueuedPrompt>;
 
@@ -888,6 +937,22 @@ export type TAgentAttachmentDataEvent = S.Schema.Type<
   typeof AgentAttachmentDataEvent
 >;
 
+/**
+ * Answer to every `attachment_put` (same `command_id`): `stored` once the
+ * file is in the cache (at once for a file already there), otherwise how many
+ * bytes the device holds so far, so the consumer sends the next chunk.
+ */
+export const AgentAttachmentStatusEvent = S.Struct({
+  ...eventBase,
+  type: S.Literal("attachment.status"),
+  sha256: AgentAttachmentSha256,
+  stored: S.Boolean,
+  received: S.Number.check(S.isInt(), S.isGreaterThanOrEqualTo(0)),
+});
+export type TAgentAttachmentStatusEvent = S.Schema.Type<
+  typeof AgentAttachmentStatusEvent
+>;
+
 /** Answer to `delete_session`: the session is gone from the device. */
 export const AgentSessionDeletedEvent = S.Struct({
   ...eventBase,
@@ -938,6 +1003,7 @@ export const AgentEvent = S.Union([
   AgentRuntimeWarningEvent,
   AgentRuntimeErrorEvent,
   AgentAttachmentDataEvent,
+  AgentAttachmentStatusEvent,
   AgentSessionDeletedEvent,
   AgentHistoryPageEvent,
 ]);
