@@ -56,6 +56,7 @@ export * from "./registry-pointer";
 export * from "./relay";
 export * from "./replay-session";
 export * from "./responses";
+export * from "./routing-box";
 export * from "./semver";
 export * from "./setup-mode";
 export * from "./stats";
