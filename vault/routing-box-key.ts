@@ -17,7 +17,7 @@
  * `@openllmsh/sdk/vault/routing-box-key`.
  */
 import { hkdfSha256 } from "./crypto";
-import { SEED_BYTES } from "./seed";
+import { DEVICE_CONTROL_SEED_BYTES } from "./device-control";
 
 export type TRoutingBoxKeyBinding = {
   readonly nonce: Uint8Array;
@@ -35,7 +35,7 @@ export const deriveRoutingBoxKey = (
   controlSeed: Uint8Array,
   binding: TRoutingBoxKeyBinding,
 ): Promise<Uint8Array> => {
-  if (controlSeed.length !== SEED_BYTES) {
+  if (controlSeed.length !== DEVICE_CONTROL_SEED_BYTES) {
     throw new Error("invalid device-control seed length");
   }
   if (binding.nonce.length !== 32)

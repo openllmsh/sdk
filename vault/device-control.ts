@@ -46,7 +46,9 @@ export const DEVICE_CONTROL_HKDF_SALT = "openllm-device-control-salt-v1";
 /** HKDF info for the at-rest "control keep" outer wrap (under the DEK). */
 export const DEVICE_CONTROL_KEEP_HKDF_INFO = "openllm-device-control-keep-v1";
 
-const SEED_BYTES = 32;
+/** Length of the device-control seed (and of the routing box key's input). */
+export const DEVICE_CONTROL_SEED_BYTES = 32;
+const SEED_BYTES = DEVICE_CONTROL_SEED_BYTES;
 
 /**
  * `HKDF-SHA256(ikm = BIP39 entropy(phrase), salt = DEVICE_CONTROL_HKDF_SALT,
