@@ -937,6 +937,86 @@ export const API_OPERATIONS: readonly TApiOperation[] = [
     "hasBody": false
   },
   {
+    "id": "routingBoxes.get",
+    "method": "get",
+    "path": "/routing-boxes",
+    "summary": "",
+    "tags": [
+      "routingBoxes"
+    ],
+    "pathParams": [],
+    "queryParams": [],
+    "hasBody": false
+  },
+  {
+    "id": "routingBoxes.create",
+    "method": "post",
+    "path": "/routing-boxes",
+    "summary": "",
+    "tags": [
+      "routingBoxes"
+    ],
+    "pathParams": [],
+    "queryParams": [],
+    "hasBody": false
+  },
+  {
+    "id": "routingBoxes.remove",
+    "method": "delete",
+    "path": "/routing-boxes/{id}",
+    "summary": "",
+    "tags": [
+      "routingBoxes"
+    ],
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "hasBody": false
+  },
+  {
+    "id": "routingBoxes.reset",
+    "method": "post",
+    "path": "/routing-boxes/{id}/reset",
+    "summary": "",
+    "tags": [
+      "routingBoxes"
+    ],
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "hasBody": false
+  },
+  {
+    "id": "routingBoxes.restart",
+    "method": "post",
+    "path": "/routing-boxes/{id}/restart",
+    "summary": "",
+    "tags": [
+      "routingBoxes"
+    ],
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "hasBody": false
+  },
+  {
+    "id": "routingBoxes.unlock",
+    "method": "post",
+    "path": "/routing-boxes/{id}/unlock",
+    "summary": "",
+    "tags": [
+      "routingBoxes"
+    ],
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "hasBody": true
+  },
+  {
     "id": "sessions.list",
     "method": "get",
     "path": "/sessions",

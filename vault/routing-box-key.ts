@@ -1,4 +1,16 @@
 /**
+ * The routing box's storage key: what opens its encrypted home.
+ *
+ * Derived from the account's DEVICE-CONTROL SEED (`device-control.ts`,
+ * itself `HKDF(vault seed)`), which an unlocked browser holds and nothing
+ * else ever does: no API key, no daemon, no server. Not from the DEK, which
+ * every API key carries and the server unwraps per request. So the key is
+ * deterministic from the recovery phrase, stored nowhere, re-derivable by the
+ * owner's browser after every reboot, and gone with a vault rotation.
+ *
+ * A fresh nonce and epoch per box (and per reset) make every box's key
+ * independent: revoking one never weakens another.
+ *
  * Deliberately NOT re-exported from `vault/index.ts`: the `openllm` binary
  * imports that barrel, and a routing box only ever receives this key, so
  * keeping it out keeps the binary unchanged. Import it by subpath:
@@ -15,19 +27,24 @@ export type TRoutingBoxKeyBinding = {
   readonly epoch: number;
 };
 
-/** Derive the box's storage key; the caller must zero the returned bytes. */
+/**
+ * Derive the box's storage key from the device-control seed; the caller must
+ * zero the returned bytes.
+ */
 export const deriveRoutingBoxKey = (
-  seed: Uint8Array,
+  controlSeed: Uint8Array,
   binding: TRoutingBoxKeyBinding,
 ): Promise<Uint8Array> => {
-  if (seed.length !== SEED_BYTES) throw new Error("invalid vault seed length");
+  if (controlSeed.length !== SEED_BYTES) {
+    throw new Error("invalid device-control seed length");
+  }
   if (binding.nonce.length !== 32)
     throw new Error("invalid routing box nonce length");
   if (!Number.isSafeInteger(binding.epoch) || binding.epoch < 0) {
     throw new Error("invalid routing box key epoch");
   }
   return hkdfSha256(
-    seed,
+    controlSeed,
     binding.nonce,
     JSON.stringify([
       "openllm-routing-box-store-v1",
