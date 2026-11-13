@@ -2,14 +2,22 @@
 export type TFusionEntry = { readonly cutoff_tokens?: number };
 export type TFusionWindowOf<T> = (entry: T) => number;
 
-/** Stable ascending input-window order; equal windows retain their original order. */
-export function sortChainForFusion<T>(
+/**
+ * Stable ascending hand-off order: a step's cutoff (its window when unset,
+ * never above it), so a 1M model handing off at 50k leads a 250k model.
+ * Equal hand-offs retain their original order.
+ */
+export function sortChainForFusion<T extends TFusionEntry>(
   entries: readonly T[],
   windowOf: TFusionWindowOf<T>,
 ): T[] {
   return entries
-    .map((entry, index) => ({ entry, index, window: windowOf(entry) }))
-    .sort((a, b) => a.window - b.window || a.index - b.index)
+    .map((entry, index) => {
+      const window = windowOf(entry);
+      const handOff = Math.min(window, entry.cutoff_tokens ?? window);
+      return { entry, index, handOff };
+    })
+    .sort((a, b) => a.handOff - b.handOff || a.index - b.index)
     .map(({ entry }) => entry);
 }
 
