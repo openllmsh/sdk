@@ -36,9 +36,9 @@ export type TDeviceAccessPinReport = S.Schema.Type<
  *
  * - `enabled`: sessions on — the install/login/loopback trust anchor is
  *   present (agent-eligible pin), the `OPENLLM_DEVICE_SESSIONS` flag is not
- *   off, and this is not a routing box. False → agent sessions fail closed
+ *   off, and this is not a Routebox. False → agent sessions fail closed
  *   with `device_not_anchored` (no anchor) or `device_sessions_disabled`
- *   (flag off / routing box); offer local enable or re-install with sessions.
+ *   (flag off / Routebox); offer local enable or re-install with sessions.
  * - `dpk_proof`: `HMAC-SHA256(pair_secret, "openllm-dpk-proof-v1" ||
  *   key_id || pubkey)`, base64url. Verify with `@openllmsh/sdk/vault`
  *   `verifyDpkProof` BEFORE using `DaemonStatus.pubkey` as `dpk`. Absent when
@@ -85,7 +85,7 @@ export type TLocalDeviceControlRequest = S.Schema.Type<
  * `key_id` is the key this daemon runs on, writes `OPENLLM_DEVICE_ANCHOR` with
  * the same writer as `openllm daemon anchor`, turns sessions on, and
  * re-derives its pin. `{ sessions: true|false }` sets `OPENLLM_DEVICE_SESSIONS`
- * only — the anchor is never removed. Enable is refused on a routing box.
+ * only — the anchor is never removed. Enable is refused on a Routebox.
  * The anchor is never logged or echoed back.
  */
 export const DEVICE_ANCHOR_LOCAL_PATH = "/local/device-anchor";
@@ -116,8 +116,8 @@ export const LocalDeviceAnchorRefusal = S.Literals([
   "malformed_anchor",
   "key_id_mismatch",
   "persist_failed",
-  /** A routing box never enables device sessions. */
-  "routing_box",
+  /** A Routebox never enables device sessions. */
+  "routebox",
 ]);
 export type TLocalDeviceAnchorRefusal = S.Schema.Type<
   typeof LocalDeviceAnchorRefusal

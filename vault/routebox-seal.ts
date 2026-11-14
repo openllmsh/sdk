@@ -1,5 +1,5 @@
 /**
- * Seal a routing box's unlock to the one-time token its current boot made.
+ * Seal a Routebox's unlock to the one-time token its current boot made.
  *
  * The box generates a fresh X25519 keypair on every boot and keeps the
  * private half in RAM (`/run`, tmpfs). The browser seals to the public half:
@@ -14,10 +14,10 @@
  *
  * Deliberately NOT re-exported from `vault/index.ts` (the `openllm` binary
  * imports that barrel). Import by subpath:
- * `@openllmsh/sdk/vault/routing-box-seal`.
+ * `@openllmsh/sdk/vault/routebox-seal`.
  *
  * The box side mirrors `open_unlock` in
- * `packages/api/lib/routing-box/box-agent.ts` (Python).
+ * `packages/api/lib/routebox/box-agent.ts` (Python).
  */
 
 import {
@@ -30,9 +30,9 @@ import {
   zero,
 } from "./crypto";
 
-export const ROUTING_BOX_SEAL_DOMAIN = "openllm-routing-box-seal-v1";
+export const ROUTEBOX_SEAL_DOMAIN = "openllm-routebox-seal-v1";
 
-export type TRoutingBoxSealBinding = {
+export type TRouteboxSealBinding = {
   readonly userId: string;
   readonly boxId: string;
   /** The box's API key; its home key derives from this key's anchor. */
@@ -44,7 +44,7 @@ export type TRoutingBoxSealBinding = {
   readonly challengeB64: string;
 };
 
-export type TRoutingBoxEnvelope = {
+export type TRouteboxEnvelope = {
   readonly v: 1;
   /** Ephemeral X25519 public key, base64 of the raw 32 bytes. */
   readonly epk: string;
@@ -58,7 +58,7 @@ export type TRoutingBoxEnvelope = {
  * control key, which WebRTC needs). Sent every time, so a box that failed
  * before installing it recovers on its next boot.
  */
-export type TRoutingBoxUnlock = {
+export type TRouteboxUnlock = {
   readonly home_key: string;
   readonly api_key: string;
 };
@@ -66,12 +66,10 @@ export type TRoutingBoxUnlock = {
 const encoder = new TextEncoder();
 
 /** Canonical associated data; the Python side builds the same bytes. */
-export const routingBoxSealAad = (
-  binding: TRoutingBoxSealBinding,
-): Uint8Array =>
+export const routeboxSealAad = (binding: TRouteboxSealBinding): Uint8Array =>
   encoder.encode(
     JSON.stringify([
-      ROUTING_BOX_SEAL_DOMAIN,
+      ROUTEBOX_SEAL_DOMAIN,
       binding.userId,
       binding.boxId,
       binding.keyId,
@@ -113,7 +111,7 @@ const deriveKey = async (
     return await hkdfSha256(
       shared,
       new Uint8Array(0),
-      JSON.stringify([ROUTING_BOX_SEAL_DOMAIN, epkB64, recipientB64]),
+      JSON.stringify([ROUTEBOX_SEAL_DOMAIN, epkB64, recipientB64]),
       32,
     );
   } finally {
@@ -122,10 +120,10 @@ const deriveKey = async (
 };
 
 /** Seal `unlock` to the boot in `binding`. */
-export const sealRoutingBoxUnlock = async (
-  binding: TRoutingBoxSealBinding,
-  unlock: TRoutingBoxUnlock,
-): Promise<TRoutingBoxEnvelope> => {
+export const sealRouteboxUnlock = async (
+  binding: TRouteboxSealBinding,
+  unlock: TRouteboxUnlock,
+): Promise<TRouteboxEnvelope> => {
   raw32(binding.challengeB64, "challenge");
   const recipient = raw32(binding.bootPubkeyB64, "boot public key");
   const eph = (await crypto.subtle.generateKey({ name: "X25519" }, true, [
@@ -148,7 +146,7 @@ export const sealRoutingBoxUnlock = async (
       epk: epkB64,
       nonce: toB64(nonce),
       ct: toB64(
-        await aesGcmEncrypt(key, nonce, plaintext, routingBoxSealAad(binding)),
+        await aesGcmEncrypt(key, nonce, plaintext, routeboxSealAad(binding)),
       ),
     };
   } finally {
@@ -158,11 +156,11 @@ export const sealRoutingBoxUnlock = async (
 };
 
 /** Open an envelope with the boot's private key (tests; the box uses Python). */
-export const openRoutingBoxUnlock = async (
-  binding: TRoutingBoxSealBinding,
-  envelope: TRoutingBoxEnvelope,
+export const openRouteboxUnlock = async (
+  binding: TRouteboxSealBinding,
+  envelope: TRouteboxEnvelope,
   bootPrivateKey: CryptoKey,
-): Promise<TRoutingBoxUnlock> => {
+): Promise<TRouteboxUnlock> => {
   if (envelope.v !== 1) throw new Error("unknown envelope version");
   const key = await deriveKey(
     bootPrivateKey,
@@ -175,12 +173,10 @@ export const openRoutingBoxUnlock = async (
       key,
       fromB64(envelope.nonce),
       fromB64(envelope.ct),
-      routingBoxSealAad(binding),
+      routeboxSealAad(binding),
     );
     try {
-      return JSON.parse(
-        new TextDecoder().decode(plaintext),
-      ) as TRoutingBoxUnlock;
+      return JSON.parse(new TextDecoder().decode(plaintext)) as TRouteboxUnlock;
     } finally {
       zero(plaintext);
     }

@@ -23249,7 +23249,7 @@
                             "type": "string",
                             "enum": [
                               "user",
-                              "routing_sandbox"
+                              "routebox"
                             ]
                           },
                           "usage": {
@@ -26371,7 +26371,7 @@
                       "type": "string",
                       "enum": [
                         "user",
-                        "routing_sandbox"
+                        "routebox"
                       ]
                     },
                     "usage": {
@@ -26755,12 +26755,12 @@
         }
       }
     },
-    "/routing-boxes": {
+    "/routebox": {
       "get": {
         "tags": [
-          "routingBoxes"
+          "routebox"
         ],
-        "operationId": "routingBoxes.get",
+        "operationId": "routebox.get",
         "parameters": [],
         "security": [],
         "responses": {
@@ -27331,9 +27331,9 @@
       },
       "post": {
         "tags": [
-          "routingBoxes"
+          "routebox"
         ],
-        "operationId": "routingBoxes.create",
+        "operationId": "routebox.create",
         "parameters": [],
         "security": [],
         "responses": {
@@ -28082,12 +28082,12 @@
         }
       }
     },
-    "/routing-boxes/{id}/restart": {
+    "/routebox/{id}/restart": {
       "post": {
         "tags": [
-          "routingBoxes"
+          "routebox"
         ],
-        "operationId": "routingBoxes.restart",
+        "operationId": "routebox.restart",
         "parameters": [
           {
             "name": "id",
@@ -28666,12 +28666,12 @@
         }
       }
     },
-    "/routing-boxes/{id}/reset": {
+    "/routebox/{id}/reset": {
       "post": {
         "tags": [
-          "routingBoxes"
+          "routebox"
         ],
-        "operationId": "routingBoxes.reset",
+        "operationId": "routebox.reset",
         "parameters": [
           {
             "name": "id",
@@ -29250,12 +29250,12 @@
         }
       }
     },
-    "/routing-boxes/{id}": {
+    "/routebox/{id}": {
       "delete": {
         "tags": [
-          "routingBoxes"
+          "routebox"
         ],
-        "operationId": "routingBoxes.remove",
+        "operationId": "routebox.remove",
         "parameters": [
           {
             "name": "id",
@@ -29834,12 +29834,12 @@
         }
       }
     },
-    "/routing-boxes/{id}/unlock": {
+    "/routebox/{id}/unlock": {
       "post": {
         "tags": [
-          "routingBoxes"
+          "routebox"
         ],
-        "operationId": "routingBoxes.unlock",
+        "operationId": "routebox.unlock",
         "parameters": [
           {
             "name": "id",
@@ -84107,7 +84107,7 @@
       "name": "keys"
     },
     {
-      "name": "routingBoxes"
+      "name": "routebox"
     },
     {
       "name": "connect"

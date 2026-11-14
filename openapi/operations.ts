@@ -937,36 +937,36 @@ export const API_OPERATIONS: readonly TApiOperation[] = [
     "hasBody": false
   },
   {
-    "id": "routingBoxes.get",
+    "id": "routebox.get",
     "method": "get",
-    "path": "/routing-boxes",
+    "path": "/routebox",
     "summary": "",
     "tags": [
-      "routingBoxes"
+      "routebox"
     ],
     "pathParams": [],
     "queryParams": [],
     "hasBody": false
   },
   {
-    "id": "routingBoxes.create",
+    "id": "routebox.create",
     "method": "post",
-    "path": "/routing-boxes",
+    "path": "/routebox",
     "summary": "",
     "tags": [
-      "routingBoxes"
+      "routebox"
     ],
     "pathParams": [],
     "queryParams": [],
     "hasBody": false
   },
   {
-    "id": "routingBoxes.remove",
+    "id": "routebox.remove",
     "method": "delete",
-    "path": "/routing-boxes/{id}",
+    "path": "/routebox/{id}",
     "summary": "",
     "tags": [
-      "routingBoxes"
+      "routebox"
     ],
     "pathParams": [
       "id"
@@ -975,12 +975,12 @@ export const API_OPERATIONS: readonly TApiOperation[] = [
     "hasBody": false
   },
   {
-    "id": "routingBoxes.reset",
+    "id": "routebox.reset",
     "method": "post",
-    "path": "/routing-boxes/{id}/reset",
+    "path": "/routebox/{id}/reset",
     "summary": "",
     "tags": [
-      "routingBoxes"
+      "routebox"
     ],
     "pathParams": [
       "id"
@@ -989,12 +989,12 @@ export const API_OPERATIONS: readonly TApiOperation[] = [
     "hasBody": false
   },
   {
-    "id": "routingBoxes.restart",
+    "id": "routebox.restart",
     "method": "post",
-    "path": "/routing-boxes/{id}/restart",
+    "path": "/routebox/{id}/restart",
     "summary": "",
     "tags": [
-      "routingBoxes"
+      "routebox"
     ],
     "pathParams": [
       "id"
@@ -1003,12 +1003,12 @@ export const API_OPERATIONS: readonly TApiOperation[] = [
     "hasBody": false
   },
   {
-    "id": "routingBoxes.unlock",
+    "id": "routebox.unlock",
     "method": "post",
-    "path": "/routing-boxes/{id}/unlock",
+    "path": "/routebox/{id}/unlock",
     "summary": "",
     "tags": [
-      "routingBoxes"
+      "routebox"
     ],
     "pathParams": [
       "id"

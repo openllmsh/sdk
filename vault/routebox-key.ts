@@ -1,5 +1,5 @@
 /**
- * The routing box's home key: what opens its encrypted home (LUKS).
+ * The Routebox's home key: what opens its encrypted home (LUKS).
  *
  * Derived from the box API key's DEVICE ANCHOR secret — the per-key pair
  * secret `HKDF(device-control seed, key id)` (`device-anchor.ts`) that every
@@ -14,16 +14,16 @@
  *
  * Deliberately NOT re-exported from `vault/index.ts`: the `openllm` binary
  * imports that barrel, and a box only ever receives this key. Import it by
- * subpath: `@openllmsh/sdk/vault/routing-box-key`.
+ * subpath: `@openllmsh/sdk/vault/routebox-key`.
  */
 import { hkdfSha256, zero } from "./crypto";
 import { deriveDevicePairSecret } from "./device-anchor";
 import { DEVICE_CONTROL_SEED_BYTES } from "./device-control";
 
-export const ROUTING_BOX_HOME_HKDF_INFO = "openllm-routing-box-home-v1";
+export const ROUTEBOX_HOME_HKDF_INFO = "openllm-routebox-home-v1";
 
 /** Derive the box's home key; the caller must zero the returned bytes. */
-export const deriveRoutingBoxHomeKey = async (
+export const deriveRouteboxHomeKey = async (
   controlSeed: Uint8Array,
   keyId: string,
 ): Promise<Uint8Array> => {
@@ -35,7 +35,7 @@ export const deriveRoutingBoxHomeKey = async (
     return await hkdfSha256(
       pairSecret,
       new Uint8Array(0),
-      ROUTING_BOX_HOME_HKDF_INFO,
+      ROUTEBOX_HOME_HKDF_INFO,
       32,
     );
   } finally {

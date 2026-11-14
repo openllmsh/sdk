@@ -1294,7 +1294,7 @@ export const DaemonStatus = S.Struct({
   device_access_pin: S.optional(DeviceAccessPinReport),
   /** Device sessions readiness + the dpk proof (`DeviceSessionsReport`).
    *  `enabled` == sessions on (anchor present, sessions flag not off, not a
-   *  routing box). Absent on daemons too old to report it — treat as off. */
+   *  Routebox). Absent on daemons too old to report it — treat as off. */
   device_sessions: S.optional(DeviceSessionsReport),
   /** The loopback port this daemon's `/v1/*` + `/whoami` surface listens on
    *  (`OPENLLM_DAEMON_PORT`, default 8787). Reported in `daemon_status_json`
