@@ -11,8 +11,8 @@
  *   browser to attest with its control key;
  * - `POST /local/device-control` → pin the account control public key
  *   directly (`via: "local"`, an anchored pin).
- * - `POST /local/device-anchor`  → install or remove the device trust anchor
- *   (sessions on == anchor present).
+ * - `POST /local/device-anchor`  → install the device trust anchor, or set the
+ *   device-sessions on/off flag (the anchor is never removed).
  */
 import { Schema as S } from "effect";
 
@@ -34,17 +34,19 @@ export type TDeviceAccessPinReport = S.Schema.Type<
  * `DaemonStatus.device_sessions` — whether this device can host agent sessions
  * and the daemon's proof of its X25519 key.
  *
- * - `anchored`: the pin descends from a local trust root (install / login /
- *   desktop loopback anchor). True == device sessions are on. False → agent
- *   sessions fail closed with `device_not_anchored`; offer "Set up device
- *   sessions".
+ * - `enabled`: sessions on — the install/login/loopback trust anchor is
+ *   present (agent-eligible pin), the `OPENLLM_DEVICE_SESSIONS` flag is not
+ *   off, and this is not a routing box. False → agent sessions fail closed
+ *   with `device_not_anchored` (no anchor) or `device_sessions_disabled`
+ *   (flag off / routing box); offer local enable or re-install with sessions.
  * - `dpk_proof`: `HMAC-SHA256(pair_secret, "openllm-dpk-proof-v1" ||
  *   key_id || pubkey)`, base64url. Verify with `@openllmsh/sdk/vault`
  *   `verifyDpkProof` BEFORE using `DaemonStatus.pubkey` as `dpk`. Absent when
- *   the daemon holds no anchor for the key it runs on.
+ *   the daemon holds no anchor for the key it runs on. The proof follows the
+ *   anchor alone — the sessions flag does not affect it.
  */
 export const DeviceSessionsReport = S.Struct({
-  anchored: S.Boolean,
+  enabled: S.Boolean,
   dpk_proof: S.optional(S.String.check(S.isMaxLength(64))),
 });
 export type TDeviceSessionsReport = S.Schema.Type<typeof DeviceSessionsReport>;
@@ -77,17 +79,19 @@ export type TLocalDeviceControlRequest = S.Schema.Type<
 >;
 
 /**
- * `POST /local/device-anchor` — install or remove this machine's trust anchor
- * over loopback (the desktop app's Device sessions toggle). Same admission as
- * `/local/device-control`. Install refuses unless `key_id` is the key this
- * daemon runs on, writes `OPENLLM_DEVICE_ANCHOR` with the same writer as
- * `openllm daemon anchor`, and re-derives its pin. Remove blanks that line.
- * The anchor is never logged or echoed back. Sessions on == anchor present.
+ * `POST /local/device-anchor` — install this machine's trust anchor, or flip
+ * the device-sessions flag, over loopback (the desktop app's Device sessions
+ * toggle). Same admission as `/local/device-control`. Install refuses unless
+ * `key_id` is the key this daemon runs on, writes `OPENLLM_DEVICE_ANCHOR` with
+ * the same writer as `openllm daemon anchor`, turns sessions on, and
+ * re-derives its pin. `{ sessions: true|false }` sets `OPENLLM_DEVICE_SESSIONS`
+ * only — the anchor is never removed. Enable is refused on a routing box.
+ * The anchor is never logged or echoed back.
  */
 export const DEVICE_ANCHOR_LOCAL_PATH = "/local/device-anchor";
 export const DEVICE_ANCHOR_LOCAL_MAX_BODY_BYTES = 512;
 
-/** `POST /local/device-anchor` body — install or remove. */
+/** `POST /local/device-anchor` body — install the anchor, or set sessions. */
 export const LocalDeviceAnchorRequest = S.Union([
   S.Struct({
     /** The API key id the anchor was derived for (`sk-llm-<key_id>.…`). */
@@ -97,8 +101,8 @@ export const LocalDeviceAnchorRequest = S.Union([
   }),
   S.Struct({
     key_id: S.String.check(S.isMinLength(1), S.isMaxLength(64)),
-    /** Blank `OPENLLM_DEVICE_ANCHOR` — sessions off. */
-    remove: S.Literal(true),
+    /** Flip `OPENLLM_DEVICE_SESSIONS` — the anchor stays. */
+    sessions: S.Boolean,
   }),
 ]);
 export type TLocalDeviceAnchorRequest = S.Schema.Type<
@@ -112,7 +116,7 @@ export const LocalDeviceAnchorRefusal = S.Literals([
   "malformed_anchor",
   "key_id_mismatch",
   "persist_failed",
-  /** A routing box keeps its anchor; its sessions are locked off. */
+  /** A routing box never enables device sessions. */
   "routing_box",
 ]);
 export type TLocalDeviceAnchorRefusal = S.Schema.Type<

@@ -688,8 +688,9 @@ const SetAutoUpdatePayload = S.Struct({ enabled: S.Boolean });
 /** Disable device sessions remotely: `statement` is the base64 envelope of
  *  `{ v: 1, key_id, ts, nonce, sig }` signed by the account control key
  *  (`@openllmsh/sdk/vault` `signDeviceSessionsDisable`). Disable-only — there is no
- *  remote enable. The daemon verifies against its ANCHORED pin and blanks
- *  `OPENLLM_DEVICE_ANCHOR`; the cloud only relays and cannot forge one. */
+ *  remote enable. The daemon verifies against its ANCHORED pin and sets
+ *  `OPENLLM_DEVICE_SESSIONS=0` (the trust anchor stays); the cloud only
+ *  relays and cannot forge one. */
 const SetDeviceSessionsPayload = S.Struct({
   statement: S.String.check(
     S.isMinLength(1),
@@ -1281,11 +1282,11 @@ export const DaemonStatus = S.Struct({
   /** The device-control pin this daemon verifies grants against: `fp` is the
    *  key's fingerprint (`keyFingerprint` in `@openllmsh/sdk/tunnel`), `via` the
    *  path that set it. Whether it is agent-eligible is reported once, in
-   *  `device_sessions.anchored`. Absent when unpinned or on older daemons. */
+   *  `device_sessions.enabled`. Absent when unpinned or on older daemons. */
   device_access_pin: S.optional(DeviceAccessPinReport),
   /** Device sessions readiness + the dpk proof (`DeviceSessionsReport`).
-   *  `anchored` == sessions on (env-file trust anchor present). Absent on
-   *  daemons too old to anchor — treat as not anchored. */
+   *  `enabled` == sessions on (anchor present, sessions flag not off, not a
+   *  routing box). Absent on daemons too old to report it — treat as off. */
   device_sessions: S.optional(DeviceSessionsReport),
   /** The loopback port this daemon's `/v1/*` + `/whoami` surface listens on
    *  (`OPENLLM_DAEMON_PORT`, default 8787). Reported in `daemon_status_json`
