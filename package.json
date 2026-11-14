@@ -1,6 +1,6 @@
 {
   "name": "@openllmsh/sdk",
-  "version": "0.0.0",
+  "version": "2.10.18-alpha.4",
   "private": false,
   "description": "The OpenLLM SDK: typed API contracts, wire-format adapters, the device tunnel, client-side vault crypto, the OpenAPI spec and MCP tools.",
   "keywords": [
