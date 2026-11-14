@@ -153,6 +153,14 @@ export const DaemonBootstrap = S.Struct({
    */
   latest_cli_version: S.optional(S.NullOr(S.String)),
   /**
+   * Targets the pinned `openllm` release carries (e.g. a prerelease omits
+   * `darwin-x64-baseline`). The daemon updater skips a swap when this host's
+   * target is absent — "no update", not an error. Optional so an older cloud
+   * that doesn't advertise it still bootstraps; absence means "try the
+   * download" (the binary route then 404s clearly).
+   */
+  cli_targets: S.optional(S.Array(S.String)),
+  /**
    * The cloud's resolved `ACTIVE_SUB_METHOD` global preference — a named
    * execution variant (`stream-json` / `sdk-facade` / `acp` / `app-server` /
    * `msp` / `agent-sdk`, optionally `-capture`) or `handrolled`; see
