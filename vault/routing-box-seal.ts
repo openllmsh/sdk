@@ -53,14 +53,14 @@ export type TRoutingBoxEnvelope = {
 };
 
 /**
- * What the box receives. `home_key` opens its encrypted home; `api_key` is
- * the box's ANCHORED `sk-llm` key (so its daemon pins the control key, which
- * WebRTC needs), sent only on its first unlock: afterwards it lives inside
- * the encrypted home.
+ * What the box receives on every boot: `home_key` opens its encrypted home,
+ * and `api_key` is the box's ANCHORED `sk-llm` key (so its daemon pins the
+ * control key, which WebRTC needs). Sent every time, so a box that failed
+ * before installing it recovers on its next boot.
  */
 export type TRoutingBoxUnlock = {
   readonly home_key: string;
-  readonly api_key?: string;
+  readonly api_key: string;
 };
 
 const encoder = new TextEncoder();
