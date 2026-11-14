@@ -15,8 +15,10 @@
  * - {@link verifyDpkProof} — check the `device_sessions.dpk_proof` a daemon
  *   publishes before trusting its `pubkey` (`dpk`) for grants, Noise or RTC.
  * - {@link signDeviceSessionsDisable} — the control-signed remote DISABLE
- *   (`set_device_sessions`). There is no remote enable; re-enable writes the
- *   anchor again via install / update / login / desktop.
+ *   (`set_device_sessions`). Sets `OPENLLM_DEVICE_SESSIONS=0`; the trust
+ *   anchor stays. There is no remote enable — turn sessions back on with
+ *   `openllm daemon device enable`, the desktop loopback flag flip, or
+ *   install / update / login when there is no anchor yet.
  */
 import type { TDeviceSessionsDisableFields } from "@openllmsh/sdk/tunnel";
 import {
