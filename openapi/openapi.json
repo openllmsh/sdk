@@ -14553,6 +14553,31 @@
                                 "items": {
                                   "type": "string"
                                 }
+                              },
+                              "fusion": {
+                                "anyOf": [
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "cutoff_tokens": {
+                                "anyOf": [
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer",
+                                      "maximum": 9007199254740991,
+                                      "exclusiveMinimum": 0
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -14993,6 +15018,31 @@
                                 "items": {
                                   "type": "string"
                                 }
+                              },
+                              "fusion": {
+                                "anyOf": [
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "cutoff_tokens": {
+                                "anyOf": [
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer",
+                                      "maximum": 9007199254740991,
+                                      "exclusiveMinimum": 0
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -76412,6 +76462,31 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "fusion": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "cutoff_tokens": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "integer",
+                                    "maximum": 9007199254740991,
+                                    "exclusiveMinimum": 0
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
                             }
                           },
                           "required": [

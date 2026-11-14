@@ -1432,6 +1432,8 @@ export const DaemonPlanResponse = S.Struct({
   origin: S.String,
   /** Context-overflow strategy for this plan. Absent means hop-to-larger-context. */
   context_overflow_strategy: S.optional(ContextOverflowStrategy),
+  /** This plan depends on the request's estimated input tokens. */
+  fusion: S.optional(S.Boolean),
   /** Reservation for a capped one-hop plan, included in the signed payload. */
   hold_nonce: S.optional(HoldNonce),
   /** Largest output the hold allows (held plans only; signed). The daemon
