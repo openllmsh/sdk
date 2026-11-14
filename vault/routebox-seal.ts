@@ -20,15 +20,8 @@
  * `packages/api/lib/routebox/box-agent.ts` (Python).
  */
 
-import {
-  aesGcmDecrypt,
-  aesGcmEncrypt,
-  fromB64,
-  hkdfSha256,
-  randomBytes,
-  toB64,
-  zero,
-} from "./crypto";
+import { fromB64, toB64, zero } from "./crypto";
+import { openX25519, sealX25519 } from "./x25519-seal";
 
 export const ROUTEBOX_SEAL_DOMAIN = "openllm-routebox-seal-v1";
 
@@ -87,70 +80,23 @@ const raw32 = (b64: string, what: string): Uint8Array => {
   return bytes;
 };
 
-const deriveKey = async (
-  privateKey: CryptoKey,
-  peerRaw: Uint8Array,
-  epkB64: string,
-  recipientB64: string,
-): Promise<Uint8Array> => {
-  const peer = await crypto.subtle.importKey(
-    "raw",
-    peerRaw as BufferSource,
-    { name: "X25519" },
-    false,
-    [],
-  );
-  const shared = new Uint8Array(
-    await crypto.subtle.deriveBits(
-      { name: "X25519", public: peer },
-      privateKey,
-      256,
-    ),
-  );
-  try {
-    return await hkdfSha256(
-      shared,
-      new Uint8Array(0),
-      JSON.stringify([ROUTEBOX_SEAL_DOMAIN, epkB64, recipientB64]),
-      32,
-    );
-  } finally {
-    zero(shared);
-  }
-};
-
 /** Seal `unlock` to the boot in `binding`. */
 export const sealRouteboxUnlock = async (
   binding: TRouteboxSealBinding,
   unlock: TRouteboxUnlock,
 ): Promise<TRouteboxEnvelope> => {
   raw32(binding.challengeB64, "challenge");
-  const recipient = raw32(binding.bootPubkeyB64, "boot public key");
-  const eph = (await crypto.subtle.generateKey({ name: "X25519" }, true, [
-    "deriveBits",
-  ])) as CryptoKeyPair;
-  const epkB64 = toB64(
-    new Uint8Array(await crypto.subtle.exportKey("raw", eph.publicKey)),
-  );
-  const key = await deriveKey(
-    eph.privateKey,
-    recipient,
-    epkB64,
-    binding.bootPubkeyB64,
-  );
   const plaintext = encoder.encode(JSON.stringify(unlock));
   try {
-    const nonce = randomBytes(12);
-    return {
-      v: 1,
-      epk: epkB64,
-      nonce: toB64(nonce),
-      ct: toB64(
-        await aesGcmEncrypt(key, nonce, plaintext, routeboxSealAad(binding)),
-      ),
-    };
+    return await sealX25519({
+      domain: ROUTEBOX_SEAL_DOMAIN,
+      recipientB64: binding.bootPubkeyB64,
+      recipientBytes: raw32(binding.bootPubkeyB64, "boot public key"),
+      format: "raw",
+      aad: routeboxSealAad(binding),
+      plaintext,
+    });
   } finally {
-    zero(key);
     zero(plaintext);
   }
 };
@@ -162,25 +108,31 @@ export const openRouteboxUnlock = async (
   bootPrivateKey: CryptoKey,
 ): Promise<TRouteboxUnlock> => {
   if (envelope.v !== 1) throw new Error("unknown envelope version");
-  const key = await deriveKey(
-    bootPrivateKey,
-    raw32(envelope.epk, "ephemeral key"),
-    envelope.epk,
-    binding.bootPubkeyB64,
-  );
+  const plaintext = await openX25519({
+    domain: ROUTEBOX_SEAL_DOMAIN,
+    privateKey: bootPrivateKey,
+    recipientB64: binding.bootPubkeyB64,
+    epkBytes: raw32(envelope.epk, "ephemeral key"),
+    epkB64: envelope.epk,
+    format: "raw",
+    aad: routeboxSealAad(binding),
+    nonce: fromB64(envelope.nonce),
+    ct: fromB64(envelope.ct),
+  });
   try {
-    const plaintext = await aesGcmDecrypt(
-      key,
-      fromB64(envelope.nonce),
-      fromB64(envelope.ct),
-      routeboxSealAad(binding),
-    );
-    try {
-      return JSON.parse(new TextDecoder().decode(plaintext)) as TRouteboxUnlock;
-    } finally {
-      zero(plaintext);
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(plaintext));
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      !("home_key" in parsed) ||
+      !("api_key" in parsed) ||
+      typeof parsed.home_key !== "string" ||
+      typeof parsed.api_key !== "string"
+    ) {
+      throw new Error("malformed routebox unlock payload");
     }
+    return { home_key: parsed.home_key, api_key: parsed.api_key };
   } finally {
-    zero(key);
+    zero(plaintext);
   }
 };
