@@ -26933,6 +26933,22 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "notice": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "machine_gone"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -27506,6 +27522,22 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "notice": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "machine_gone"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -27680,6 +27712,22 @@
                             "updated_at"
                           ],
                           "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "notice": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "machine_gone"
+                          ]
+                        },
+                        {
+                          "type": "null"
                         },
                         {
                           "type": "null"
@@ -28269,6 +28317,22 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "notice": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "machine_gone"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -28853,6 +28917,22 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "notice": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "machine_gone"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -29432,6 +29512,22 @@
                             "updated_at"
                           ],
                           "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "notice": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "machine_gone"
+                          ]
+                        },
+                        {
+                          "type": "null"
                         },
                         {
                           "type": "null"
