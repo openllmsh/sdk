@@ -12291,17 +12291,35 @@
                   "prompt": {
                     "type": "string"
                   },
-                  "image": {
-                    "type": "object",
-                    "properties": {
-                      "url": {
-                        "type": "string"
+                  "images": {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "url"
+                        ],
+                        "additionalProperties": false
                       }
-                    },
-                    "required": [
-                      "url"
                     ],
-                    "additionalProperties": false
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ],
+                      "additionalProperties": false
+                    }
                   },
                   "n": {
                     "anyOf": [
@@ -12356,7 +12374,7 @@
                 },
                 "required": [
                   "prompt",
-                  "image"
+                  "images"
                 ],
                 "additionalProperties": false
               }

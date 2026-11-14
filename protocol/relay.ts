@@ -344,7 +344,7 @@ export const RelayStatusPushFrame = S.Struct({
 });
 export type TRelayStatusPushFrame = S.Schema.Type<typeof RelayStatusPushFrame>;
 
-/** relay → watcher. A key's daemon presence flipped (socket open/close). */
+/** relay → watcher + the user's other daemons. A key's daemon presence flipped. */
 export const RelayPresenceFrame = S.Struct({
   type: S.Literal("presence"),
   key_id: S.String,
