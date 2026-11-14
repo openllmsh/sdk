@@ -7,8 +7,8 @@
  * construction as `public-key-seal.ts`, so the box can open it with Python's
  * `cryptography` (cloud-init's own dependency) and no OpenLLM binary change.
  *
- * The associated data binds the envelope to the user, box, key epoch, boot
- * generation, boot public key and challenge, so an envelope sealed for one
+ * The associated data binds the envelope to the user, box, the box's API key
+ * id, boot generation, boot public key and challenge, so an envelope sealed for one
  * boot can't be replayed into another, and the server, which only stores and
  * forwards the ciphertext, can't redirect it.
  *
@@ -35,7 +35,8 @@ export const ROUTING_BOX_SEAL_DOMAIN = "openllm-routing-box-seal-v1";
 export type TRoutingBoxSealBinding = {
   readonly userId: string;
   readonly boxId: string;
-  readonly epoch: number;
+  /** The box's API key; its home key derives from this key's anchor. */
+  readonly keyId: string;
   readonly bootGeneration: number;
   /** The boot's X25519 public key, base64 of the raw 32 bytes. */
   readonly bootPubkeyB64: string;
@@ -52,12 +53,13 @@ export type TRoutingBoxEnvelope = {
 };
 
 /**
- * What the box receives. `k_box` opens its encrypted home; `api_key` is the
- * box's `sk-llm` key, sent only on the box's first unlock (afterwards it
- * lives inside the encrypted home).
+ * What the box receives. `home_key` opens its encrypted home; `api_key` is
+ * the box's ANCHORED `sk-llm` key (so its daemon pins the control key, which
+ * WebRTC needs), sent only on its first unlock: afterwards it lives inside
+ * the encrypted home.
  */
 export type TRoutingBoxUnlock = {
-  readonly k_box: string;
+  readonly home_key: string;
   readonly api_key?: string;
 };
 
@@ -72,7 +74,7 @@ export const routingBoxSealAad = (
       ROUTING_BOX_SEAL_DOMAIN,
       binding.userId,
       binding.boxId,
-      binding.epoch,
+      binding.keyId,
       binding.bootGeneration,
       binding.bootPubkeyB64,
       binding.challengeB64,

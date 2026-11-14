@@ -1,58 +1,44 @@
 /**
- * The routing box's storage key: what opens its encrypted home.
+ * The routing box's home key: what opens its encrypted home (LUKS).
  *
- * Derived from the account's DEVICE-CONTROL SEED (`device-control.ts`,
- * itself `HKDF(vault seed)`), which an unlocked browser holds and nothing
- * else ever does: no API key, no daemon, no server. Not from the DEK, which
- * every API key carries and the server unwraps per request. So the key is
- * deterministic from the recovery phrase, stored nowhere, re-derivable by the
- * owner's browser after every reboot, and gone with a vault rotation.
- *
- * A fresh nonce and epoch per box (and per reset) make every box's key
- * independent: revoking one never weakens another.
+ * Derived from the box API key's DEVICE ANCHOR secret — the per-key pair
+ * secret `HKDF(device-control seed, key id)` (`device-anchor.ts`) that every
+ * anchored device already holds — under its own label, so the home key and the
+ * anchor's other uses never coincide. The device-control seed is itself
+ * `HKDF(vault seed)`, held by an unlocked browser and by nothing else: no API
+ * key, daemon or server. So the home key is deterministic from the recovery
+ * phrase, stored nowhere, re-derivable by the owner's browser after every
+ * reboot, different for every key, and gone with a vault rotation. A box that
+ * is reset or replaced gets a new key, so a new home key; deleting the key is
+ * the revocation.
  *
  * Deliberately NOT re-exported from `vault/index.ts`: the `openllm` binary
- * imports that barrel, and a routing box only ever receives this key, so
- * keeping it out keeps the binary unchanged. Import it by subpath:
- * `@openllmsh/sdk/vault/routing-box-key`.
+ * imports that barrel, and a box only ever receives this key. Import it by
+ * subpath: `@openllmsh/sdk/vault/routing-box-key`.
  */
-import { hkdfSha256 } from "./crypto";
+import { hkdfSha256, zero } from "./crypto";
+import { deriveDevicePairSecret } from "./device-anchor";
 import { DEVICE_CONTROL_SEED_BYTES } from "./device-control";
 
-export type TRoutingBoxKeyBinding = {
-  readonly nonce: Uint8Array;
-  readonly userId: string;
-  readonly vaultKeyId: string;
-  readonly boxId: string;
-  readonly epoch: number;
-};
+export const ROUTING_BOX_HOME_HKDF_INFO = "openllm-routing-box-home-v1";
 
-/**
- * Derive the box's storage key from the device-control seed; the caller must
- * zero the returned bytes.
- */
-export const deriveRoutingBoxKey = (
+/** Derive the box's home key; the caller must zero the returned bytes. */
+export const deriveRoutingBoxHomeKey = async (
   controlSeed: Uint8Array,
-  binding: TRoutingBoxKeyBinding,
+  keyId: string,
 ): Promise<Uint8Array> => {
   if (controlSeed.length !== DEVICE_CONTROL_SEED_BYTES) {
     throw new Error("invalid device-control seed length");
   }
-  if (binding.nonce.length !== 32)
-    throw new Error("invalid routing box nonce length");
-  if (!Number.isSafeInteger(binding.epoch) || binding.epoch < 0) {
-    throw new Error("invalid routing box key epoch");
+  const pairSecret = await deriveDevicePairSecret(controlSeed, keyId);
+  try {
+    return await hkdfSha256(
+      pairSecret,
+      new Uint8Array(0),
+      ROUTING_BOX_HOME_HKDF_INFO,
+      32,
+    );
+  } finally {
+    zero(pairSecret);
   }
-  return hkdfSha256(
-    controlSeed,
-    binding.nonce,
-    JSON.stringify([
-      "openllm-routing-box-store-v1",
-      binding.userId,
-      binding.vaultKeyId,
-      binding.boxId,
-      binding.epoch,
-    ]),
-    32,
-  );
 };

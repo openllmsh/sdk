@@ -26803,26 +26803,15 @@
                             "vault_key_id": {
                               "type": "string"
                             },
-                            "key_epoch": {
+                            "key_id": {
                               "anyOf": [
                                 {
-                                  "type": "number"
+                                  "type": "string"
                                 },
                                 {
-                                  "type": "string",
-                                  "enum": [
-                                    "Infinity",
-                                    "-Infinity",
-                                    "NaN"
-                                  ]
+                                  "type": "null"
                                 }
                               ]
-                            },
-                            "kdf_nonce": {
-                              "type": "string"
-                            },
-                            "has_key": {
-                              "type": "boolean"
                             },
                             "unlock_sent": {
                               "type": "boolean"
@@ -26882,9 +26871,7 @@
                             "public_ipv4",
                             "failure_code",
                             "vault_key_id",
-                            "key_epoch",
-                            "kdf_nonce",
-                            "has_key",
+                            "key_id",
                             "unlock_sent",
                             "boot",
                             "created_at",
@@ -27389,26 +27376,15 @@
                             "vault_key_id": {
                               "type": "string"
                             },
-                            "key_epoch": {
+                            "key_id": {
                               "anyOf": [
                                 {
-                                  "type": "number"
+                                  "type": "string"
                                 },
                                 {
-                                  "type": "string",
-                                  "enum": [
-                                    "Infinity",
-                                    "-Infinity",
-                                    "NaN"
-                                  ]
+                                  "type": "null"
                                 }
                               ]
-                            },
-                            "kdf_nonce": {
-                              "type": "string"
-                            },
-                            "has_key": {
-                              "type": "boolean"
                             },
                             "unlock_sent": {
                               "type": "boolean"
@@ -27468,9 +27444,7 @@
                             "public_ipv4",
                             "failure_code",
                             "vault_key_id",
-                            "key_epoch",
-                            "kdf_nonce",
-                            "has_key",
+                            "key_id",
                             "unlock_sent",
                             "boot",
                             "created_at",
@@ -27581,26 +27555,15 @@
                             "vault_key_id": {
                               "type": "string"
                             },
-                            "key_epoch": {
+                            "key_id": {
                               "anyOf": [
                                 {
-                                  "type": "number"
+                                  "type": "string"
                                 },
                                 {
-                                  "type": "string",
-                                  "enum": [
-                                    "Infinity",
-                                    "-Infinity",
-                                    "NaN"
-                                  ]
+                                  "type": "null"
                                 }
                               ]
-                            },
-                            "kdf_nonce": {
-                              "type": "string"
-                            },
-                            "has_key": {
-                              "type": "boolean"
                             },
                             "unlock_sent": {
                               "type": "boolean"
@@ -27660,9 +27623,7 @@
                             "public_ipv4",
                             "failure_code",
                             "vault_key_id",
-                            "key_epoch",
-                            "kdf_nonce",
-                            "has_key",
+                            "key_id",
                             "unlock_sent",
                             "boot",
                             "created_at",
@@ -28178,26 +28139,15 @@
                             "vault_key_id": {
                               "type": "string"
                             },
-                            "key_epoch": {
+                            "key_id": {
                               "anyOf": [
                                 {
-                                  "type": "number"
+                                  "type": "string"
                                 },
                                 {
-                                  "type": "string",
-                                  "enum": [
-                                    "Infinity",
-                                    "-Infinity",
-                                    "NaN"
-                                  ]
+                                  "type": "null"
                                 }
                               ]
-                            },
-                            "kdf_nonce": {
-                              "type": "string"
-                            },
-                            "has_key": {
-                              "type": "boolean"
                             },
                             "unlock_sent": {
                               "type": "boolean"
@@ -28257,9 +28207,7 @@
                             "public_ipv4",
                             "failure_code",
                             "vault_key_id",
-                            "key_epoch",
-                            "kdf_nonce",
-                            "has_key",
+                            "key_id",
                             "unlock_sent",
                             "boot",
                             "created_at",
@@ -28775,26 +28723,15 @@
                             "vault_key_id": {
                               "type": "string"
                             },
-                            "key_epoch": {
+                            "key_id": {
                               "anyOf": [
                                 {
-                                  "type": "number"
+                                  "type": "string"
                                 },
                                 {
-                                  "type": "string",
-                                  "enum": [
-                                    "Infinity",
-                                    "-Infinity",
-                                    "NaN"
-                                  ]
+                                  "type": "null"
                                 }
                               ]
-                            },
-                            "kdf_nonce": {
-                              "type": "string"
-                            },
-                            "has_key": {
-                              "type": "boolean"
                             },
                             "unlock_sent": {
                               "type": "boolean"
@@ -28854,9 +28791,7 @@
                             "public_ipv4",
                             "failure_code",
                             "vault_key_id",
-                            "key_epoch",
-                            "kdf_nonce",
-                            "has_key",
+                            "key_id",
                             "unlock_sent",
                             "boot",
                             "created_at",
@@ -29372,26 +29307,15 @@
                             "vault_key_id": {
                               "type": "string"
                             },
-                            "key_epoch": {
+                            "key_id": {
                               "anyOf": [
                                 {
-                                  "type": "number"
+                                  "type": "string"
                                 },
                                 {
-                                  "type": "string",
-                                  "enum": [
-                                    "Infinity",
-                                    "-Infinity",
-                                    "NaN"
-                                  ]
+                                  "type": "null"
                                 }
                               ]
-                            },
-                            "kdf_nonce": {
-                              "type": "string"
-                            },
-                            "has_key": {
-                              "type": "boolean"
                             },
                             "unlock_sent": {
                               "type": "boolean"
@@ -29451,9 +29375,7 @@
                             "public_ipv4",
                             "failure_code",
                             "vault_key_id",
-                            "key_epoch",
-                            "kdf_nonce",
-                            "has_key",
+                            "key_id",
                             "unlock_sent",
                             "boot",
                             "created_at",
