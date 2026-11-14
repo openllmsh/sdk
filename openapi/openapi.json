@@ -26824,6 +26824,9 @@
                             "has_key": {
                               "type": "boolean"
                             },
+                            "unlock_sent": {
+                              "type": "boolean"
+                            },
                             "boot": {
                               "anyOf": [
                                 {
@@ -26882,6 +26885,7 @@
                             "key_epoch",
                             "kdf_nonce",
                             "has_key",
+                            "unlock_sent",
                             "boot",
                             "created_at",
                             "updated_at"
@@ -27406,6 +27410,9 @@
                             "has_key": {
                               "type": "boolean"
                             },
+                            "unlock_sent": {
+                              "type": "boolean"
+                            },
                             "boot": {
                               "anyOf": [
                                 {
@@ -27464,6 +27471,7 @@
                             "key_epoch",
                             "kdf_nonce",
                             "has_key",
+                            "unlock_sent",
                             "boot",
                             "created_at",
                             "updated_at"
@@ -27594,6 +27602,9 @@
                             "has_key": {
                               "type": "boolean"
                             },
+                            "unlock_sent": {
+                              "type": "boolean"
+                            },
                             "boot": {
                               "anyOf": [
                                 {
@@ -27652,6 +27663,7 @@
                             "key_epoch",
                             "kdf_nonce",
                             "has_key",
+                            "unlock_sent",
                             "boot",
                             "created_at",
                             "updated_at"
@@ -28187,6 +28199,9 @@
                             "has_key": {
                               "type": "boolean"
                             },
+                            "unlock_sent": {
+                              "type": "boolean"
+                            },
                             "boot": {
                               "anyOf": [
                                 {
@@ -28245,6 +28260,7 @@
                             "key_epoch",
                             "kdf_nonce",
                             "has_key",
+                            "unlock_sent",
                             "boot",
                             "created_at",
                             "updated_at"
@@ -28780,6 +28796,9 @@
                             "has_key": {
                               "type": "boolean"
                             },
+                            "unlock_sent": {
+                              "type": "boolean"
+                            },
                             "boot": {
                               "anyOf": [
                                 {
@@ -28838,6 +28857,7 @@
                             "key_epoch",
                             "kdf_nonce",
                             "has_key",
+                            "unlock_sent",
                             "boot",
                             "created_at",
                             "updated_at"
@@ -29373,6 +29393,9 @@
                             "has_key": {
                               "type": "boolean"
                             },
+                            "unlock_sent": {
+                              "type": "boolean"
+                            },
                             "boot": {
                               "anyOf": [
                                 {
@@ -29431,6 +29454,7 @@
                             "key_epoch",
                             "kdf_nonce",
                             "has_key",
+                            "unlock_sent",
                             "boot",
                             "created_at",
                             "updated_at"
