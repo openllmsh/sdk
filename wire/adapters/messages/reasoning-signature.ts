@@ -50,6 +50,13 @@ export type TReasoningResponsesInput = {
  */
 const SIGNATURE_PREFIX = "openllm-rs1:";
 const NATIVE_ASSISTANT_SIGNATURE_PREFIX = "openllm-cn1:";
+/** True for a thinking `signature` that OpenLLM minted (a Responses
+ *  reasoning envelope or a native-assistant carrier) rather than Anthropic.
+ *  Anthropic can never verify one, so a replay to Anthropic must drop it. */
+export const isOpenllmEnvelopeSignature = (signature: unknown): boolean =>
+  typeof signature === "string" &&
+  (signature.startsWith(SIGNATURE_PREFIX) ||
+    signature.startsWith(NATIVE_ASSISTANT_SIGNATURE_PREFIX));
 export const CLAUDE_NATIVE_ASSISTANT_CARRIER = "claude_native_assistant";
 export const CLAUDE_NATIVE_ASSISTANT_PENDING =
   "claude_native_assistant_pending";

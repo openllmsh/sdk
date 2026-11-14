@@ -26,22 +26,29 @@
  *   next user turn answers with `tool_result`. Blindly stripping that block
  *   breaks the tool loop (`thinking`/`redacted_thinking` blocks in the latest
  *   assistant message cannot be modified / must round-trip).
- * - **Limitation (documented, not papered over).** If the preserved final-turn
- *   thinking itself carries a foreign-model signature, the same 400 will fire
- *   again after strip (we deliberately did not touch it). Cross-model
- *   mid-tool-loop continuation cannot be made valid: keeping the block 400s on
- *   signature, stripping it 400s on tool-use integrity. The reactive retry then
- *   surfaces the original error and the walker advances / fails normally. Same-
- *   model tool_use continuation is unaffected (signature still verifies).
- * - **No proactive strip.** Some signature forms embed their minting model
- *   (e.g. Anthropic CAIS), so origin is not always opaque — but the origin
- *   model is not the deciding factor: only the TARGET model's acceptance is,
- *   and that is knowable only from its response. Same-family signatures are
- *   frequently accepted, so proactively stripping on every model hop would
- *   bust prompt cache on healthy same-model multi-turn for no reason. The
- *   reactive 400 → strip → retry path strips only when the upstream actually
- *   rejects, which is the correctness backstop.
+ * - **Last resort: thinking off for this request.** If the preserved final-turn
+ *   thinking itself carries a foreign-model signature (e.g. a Sonnet subagent
+ *   fed an Opus-signed tool-use turn), keeping the block 400s on signature and
+ *   stripping it alone 400s on tool-use integrity — but that integrity rule
+ *   only applies while extended thinking is ON. {@link stripAllThinkingAndDisable}
+ *   strips every thinking block AND removes the `thinking` param (plus the
+ *   thinking-only `clear_thinking` context edits), which Anthropic accepts.
+ *   Mirrors litellm's `strip_thinking_blocks_from_anthropic_messages_request_dict`.
+ *   The model just doesn't think on that one turn; the next turn re-enables it.
+ * - **Proactive strip only for OpenLLM-minted signatures.** A thinking block
+ *   whose signature is an OpenLLM envelope (`openllm-rs1:` / `openllm-cn1:`,
+ *   from a Muse / Codex / Grok turn) can never verify at Anthropic, so
+ *   {@link sanitizeAnthropicReplay} drops it before sending. Genuine Anthropic
+ *   signatures are never proactively stripped: only the TARGET model's
+ *   acceptance decides, same-family signatures are often accepted, and
+ *   stripping them would bust prompt cache on healthy multi-turn. Those go
+ *   through the reactive 400 → strip → retry path.
+ * - **No empty assistant turns.** An assistant message left with no content
+ *   after a strip (a thinking-only turn) is dropped — Anthropic rejects empty
+ *   content, and adjacent user turns are merged upstream.
  */
+
+import { isOpenllmEnvelopeSignature } from "../adapters/messages/reasoning-signature";
 
 /** Anthropic 400 body for an undecryptable / foreign-model thinking signature.
  *  Matches the documented phrasing and tolerates the `messages.N.content.M: `
@@ -125,32 +132,132 @@ export const messagesBodyHasStrippableThinking = (body: unknown): boolean => {
   );
 };
 
+/** Remove the blocks `drop` selects from assistant messages, and drop any
+ *  assistant message the removal leaves empty. `drop` sees the message's
+ *  ORIGINAL index (before any message is removed). */
+const stripAssistantBlocks = (
+  messages: ReadonlyArray<unknown>,
+  drop: (block: unknown, index: number) => boolean,
+): unknown[] => {
+  const out: unknown[] = [];
+  messages.forEach((msg, i) => {
+    const content = messageContent(msg);
+    if (
+      (msg as { role?: unknown } | null)?.role !== "assistant" ||
+      content === null ||
+      !content.some((block) => drop(block, i))
+    ) {
+      out.push(msg);
+      return;
+    }
+    const kept = content.filter((block) => !drop(block, i));
+    if (kept.length > 0) {
+      out.push({ ...(msg as Record<string, unknown>), content: kept });
+    }
+  });
+  return out;
+};
+
+const withMessages = (
+  body: unknown,
+  map: (messages: ReadonlyArray<unknown>) => unknown[],
+): unknown => {
+  if (body === null || typeof body !== "object") return body;
+  const messages = (body as { messages?: unknown }).messages;
+  if (!Array.isArray(messages)) return body;
+  return { ...(body as Record<string, unknown>), messages: map(messages) };
+};
+
 /** Return a copy of a built Anthropic Messages body with `thinking` and
  *  `redacted_thinking` blocks removed from every HISTORICAL assistant message.
  *  The active tool-use continuation assistant turn (tool_use answered by a
  *  trailing tool_result) is left intact — see file header. Other content
  *  blocks and non-assistant messages are untouched; order is preserved. */
-export const stripMessagesThinkingBlocks = (body: unknown): unknown => {
+export const stripMessagesThinkingBlocks = (body: unknown): unknown =>
+  withMessages(body, (messages) =>
+    stripAssistantBlocks(
+      messages,
+      (block, i) =>
+        isThinkingBlock(block) && !isActiveToolUseContinuation(messages, i),
+    ),
+  );
+
+const isForeignThinkingBlock = (block: unknown): boolean =>
+  isThinkingBlock(block) &&
+  isOpenllmEnvelopeSignature((block as { signature?: unknown }).signature);
+
+export type TAnthropicReplaySanitized = {
+  readonly body: unknown;
+  /** The active tool-use turn's thinking was OpenLLM-minted, so extended
+   *  thinking is off for this request. */
+  readonly thinkingDisabled: boolean;
+};
+
+/**
+ * Proactive, certain half of the recovery: drop every thinking block whose
+ * signature OpenLLM minted (a Muse / Codex / Grok turn replayed into
+ * Anthropic) BEFORE sending — Anthropic can never verify those, so this
+ * costs no request and leaves Anthropic-signed history (and its cache)
+ * alone. When the active tool-use turn's thinking is foreign, thinking is
+ * turned off for this request (Anthropic requires that turn's thinking while
+ * it is on). A cross-model Anthropic rejection still goes through the
+ * reactive retry.
+ */
+export const sanitizeAnthropicReplay = (
+  body: unknown,
+): TAnthropicReplaySanitized => {
+  const messages = (body as { messages?: unknown } | null)?.messages;
+  if (!Array.isArray(messages)) return { body, thinkingDisabled: false };
+  const hasForeign = (msg: unknown): boolean =>
+    (msg as { role?: unknown } | null)?.role === "assistant" &&
+    (messageContent(msg)?.some(isForeignThinkingBlock) ?? false);
+  if (!messages.some(hasForeign)) return { body, thinkingDisabled: false };
+  const activeIndex = messages.length - 2;
+  if (
+    isActiveToolUseContinuation(messages, activeIndex) &&
+    hasForeign(messages[activeIndex])
+  ) {
+    return { body: stripAllThinkingAndDisable(body), thinkingDisabled: true };
+  }
+  return {
+    body: withMessages(body, (m) =>
+      stripAssistantBlocks(m, isForeignThinkingBlock),
+    ),
+    thinkingDisabled: false,
+  };
+};
+
+/** True when a built Anthropic Messages body carries ANY assistant
+ *  `thinking`/`redacted_thinking` block (the active turn included). */
+export const messagesBodyHasAnyThinking = (body: unknown): boolean => {
+  const messages = (body as { messages?: unknown } | null)?.messages;
+  return Array.isArray(messages) && messages.some(isAssistantWithThinking);
+};
+
+const isClearThinkingEdit = (edit: unknown): boolean =>
+  edit !== null &&
+  typeof edit === "object" &&
+  String((edit as { type?: unknown }).type ?? "").startsWith("clear_thinking");
+
+/** Last-resort recovery: strip thinking from EVERY assistant message (the
+ *  active tool-use turn included) and turn extended thinking off for this
+ *  request — without `thinking` enabled Anthropic no longer requires the
+ *  final tool-use turn to carry its thinking. `clear_thinking_*` context
+ *  edits are dropped too since they require thinking. See file header. */
+export const stripAllThinkingAndDisable = (body: unknown): unknown => {
   if (body === null || typeof body !== "object") return body;
-  const b = body as { messages?: unknown };
-  if (!Array.isArray(b.messages)) return body;
-
-  const messages = b.messages.map((msg, i) => {
-    if (msg === null || typeof msg !== "object") return msg;
-    if ((msg as { role?: unknown }).role !== "assistant") return msg;
-    if (isActiveToolUseContinuation(b.messages as ReadonlyArray<unknown>, i)) {
-      return msg;
-    }
-    const content = messageContent(msg);
-    if (content === null || !content.some(isThinkingBlock)) return msg;
-    // Drop only thinking / redacted_thinking; keep text, tool_use, etc. in order.
-    // Empty content after strip is left as `[]` — rare (assistant-only-thinking
-    // turns); inventing a placeholder would be non-deterministic / semantic.
-    return {
-      ...(msg as Record<string, unknown>),
-      content: content.filter((block) => !isThinkingBlock(block)),
-    };
-  });
-
-  return { ...(body as Record<string, unknown>), messages };
+  const { thinking: _thinking, ...rest } = withMessages(body, (m) =>
+    stripAssistantBlocks(m, isThinkingBlock),
+  ) as Record<string, unknown>;
+  const cm = rest.context_management;
+  const edits = (cm as { edits?: unknown } | null)?.edits;
+  if (!Array.isArray(edits) || !edits.some(isClearThinkingEdit)) return rest;
+  const { context_management: _cm, ...withoutCm } = rest;
+  const kept = edits.filter((e) => !isClearThinkingEdit(e));
+  return kept.length > 0
+    ? {
+        ...withoutCm,
+        context_management: { ...(cm as Record<string, unknown>), edits: kept },
+      }
+    : withoutCm;
 };
