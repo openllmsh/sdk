@@ -112,6 +112,8 @@ export const LocalDeviceAnchorRefusal = S.Literals([
   "malformed_anchor",
   "key_id_mismatch",
   "persist_failed",
+  /** A routing box keeps its anchor; its sessions are locked off. */
+  "routing_box",
 ]);
 export type TLocalDeviceAnchorRefusal = S.Schema.Type<
   typeof LocalDeviceAnchorRefusal
