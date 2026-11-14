@@ -26779,27 +26779,6 @@
                             "id": {
                               "type": "string"
                             },
-                            "kind": {
-                              "type": "string",
-                              "enum": [
-                                "routing"
-                              ]
-                            },
-                            "capabilities": {
-                              "type": "object",
-                              "properties": {
-                                "device_sessions": {
-                                  "type": "boolean",
-                                  "enum": [
-                                    false
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "device_sessions"
-                              ],
-                              "additionalProperties": false
-                            },
                             "state": {
                               "type": "string",
                               "enum": [
@@ -26914,8 +26893,6 @@
                           },
                           "required": [
                             "id",
-                            "kind",
-                            "capabilities",
                             "state",
                             "generation",
                             "public_ipv4",
@@ -27368,27 +27345,6 @@
                             "id": {
                               "type": "string"
                             },
-                            "kind": {
-                              "type": "string",
-                              "enum": [
-                                "routing"
-                              ]
-                            },
-                            "capabilities": {
-                              "type": "object",
-                              "properties": {
-                                "device_sessions": {
-                                  "type": "boolean",
-                                  "enum": [
-                                    false
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "device_sessions"
-                              ],
-                              "additionalProperties": false
-                            },
                             "state": {
                               "type": "string",
                               "enum": [
@@ -27503,8 +27459,6 @@
                           },
                           "required": [
                             "id",
-                            "kind",
-                            "capabilities",
                             "state",
                             "generation",
                             "public_ipv4",
@@ -27563,27 +27517,6 @@
                             "id": {
                               "type": "string"
                             },
-                            "kind": {
-                              "type": "string",
-                              "enum": [
-                                "routing"
-                              ]
-                            },
-                            "capabilities": {
-                              "type": "object",
-                              "properties": {
-                                "device_sessions": {
-                                  "type": "boolean",
-                                  "enum": [
-                                    false
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "device_sessions"
-                              ],
-                              "additionalProperties": false
-                            },
                             "state": {
                               "type": "string",
                               "enum": [
@@ -27698,8 +27631,6 @@
                           },
                           "required": [
                             "id",
-                            "kind",
-                            "capabilities",
                             "state",
                             "generation",
                             "public_ipv4",
@@ -28163,27 +28094,6 @@
                             "id": {
                               "type": "string"
                             },
-                            "kind": {
-                              "type": "string",
-                              "enum": [
-                                "routing"
-                              ]
-                            },
-                            "capabilities": {
-                              "type": "object",
-                              "properties": {
-                                "device_sessions": {
-                                  "type": "boolean",
-                                  "enum": [
-                                    false
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "device_sessions"
-                              ],
-                              "additionalProperties": false
-                            },
                             "state": {
                               "type": "string",
                               "enum": [
@@ -28298,8 +28208,6 @@
                           },
                           "required": [
                             "id",
-                            "kind",
-                            "capabilities",
                             "state",
                             "generation",
                             "public_ipv4",
@@ -28763,27 +28671,6 @@
                             "id": {
                               "type": "string"
                             },
-                            "kind": {
-                              "type": "string",
-                              "enum": [
-                                "routing"
-                              ]
-                            },
-                            "capabilities": {
-                              "type": "object",
-                              "properties": {
-                                "device_sessions": {
-                                  "type": "boolean",
-                                  "enum": [
-                                    false
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "device_sessions"
-                              ],
-                              "additionalProperties": false
-                            },
                             "state": {
                               "type": "string",
                               "enum": [
@@ -28898,8 +28785,6 @@
                           },
                           "required": [
                             "id",
-                            "kind",
-                            "capabilities",
                             "state",
                             "generation",
                             "public_ipv4",
@@ -29363,27 +29248,6 @@
                             "id": {
                               "type": "string"
                             },
-                            "kind": {
-                              "type": "string",
-                              "enum": [
-                                "routing"
-                              ]
-                            },
-                            "capabilities": {
-                              "type": "object",
-                              "properties": {
-                                "device_sessions": {
-                                  "type": "boolean",
-                                  "enum": [
-                                    false
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "device_sessions"
-                              ],
-                              "additionalProperties": false
-                            },
                             "state": {
                               "type": "string",
                               "enum": [
@@ -29498,8 +29362,6 @@
                           },
                           "required": [
                             "id",
-                            "kind",
-                            "capabilities",
                             "state",
                             "generation",
                             "public_ipv4",

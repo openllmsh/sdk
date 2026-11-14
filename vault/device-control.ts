@@ -48,7 +48,6 @@ export const DEVICE_CONTROL_KEEP_HKDF_INFO = "openllm-device-control-keep-v1";
 
 /** Length of the device-control seed (and of the Routebox key's input). */
 export const DEVICE_CONTROL_SEED_BYTES = 32;
-const SEED_BYTES = DEVICE_CONTROL_SEED_BYTES;
 
 /**
  * `HKDF-SHA256(ikm = BIP39 entropy(phrase), salt = DEVICE_CONTROL_HKDF_SALT,
@@ -80,7 +79,7 @@ export const deriveDeviceControlSeedFromVaultSeed = (
     vaultSeed,
     new TextEncoder().encode(DEVICE_CONTROL_HKDF_SALT),
     DEVICE_CONTROL_HKDF_INFO,
-    SEED_BYTES,
+    DEVICE_CONTROL_SEED_BYTES,
   );
 
 /** The control public key as base64(SPKI DER) — the value daemons pin. */
@@ -109,7 +108,7 @@ export const controlKeepOuterKey = (
     dek,
     new TextEncoder().encode(userId),
     DEVICE_CONTROL_KEEP_HKDF_INFO,
-    SEED_BYTES,
+    DEVICE_CONTROL_SEED_BYTES,
   );
 };
 
