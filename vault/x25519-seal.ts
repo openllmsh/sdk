@@ -72,7 +72,7 @@ export const sealX25519 = async (params: {
   readonly aad: Uint8Array;
   readonly plaintext: Uint8Array;
 }): Promise<TX25519Sealed> => {
-  const eph = (await crypto.subtle.generateKey({ name: "X25519" }, true, [
+  const eph = (await crypto.subtle.generateKey({ name: "X25519" }, false, [
     "deriveBits",
   ])) as CryptoKeyPair;
   const epk = toB64(
