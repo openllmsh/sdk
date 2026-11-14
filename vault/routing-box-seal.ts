@@ -16,8 +16,8 @@
  * imports that barrel). Import by subpath:
  * `@openllmsh/sdk/vault/routing-box-seal`.
  *
- * The box side mirrors `openRoutingBoxEnvelope` in
- * `packages/api/lib/routing-box/cloud-init.ts` (Python).
+ * The box side mirrors `open_unlock` in
+ * `packages/api/lib/routing-box/box-agent.ts` (Python).
  */
 
 import {
