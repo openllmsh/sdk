@@ -118,12 +118,32 @@ const newApiKeyId = (): string =>
  *      vault_version }` to `/api/keys`,
  *   6. shows `sk-llm-{id}.{secret_b64url}` once.
  */
-export const mintApiKey = async (
+export const mintApiKey = (
   dek: Uint8Array,
   vaultVersion: number,
+): Promise<TMintedApiKey> =>
+  mintApiKeyFrom(
+    dek,
+    vaultVersion,
+    newApiKeyId(),
+    randomBytes(OPENLLM_API_KEY_SECRET_BYTES),
+  );
+
+/**
+ * {@link mintApiKey} with a caller-chosen `(id, secret)` — for a key that must
+ * be re-derivable (the Routebox's, from the seed). The DEK wrap and the sealed
+ * copy still use random nonces, so the row differs per call but the `sk-llm`
+ * string is the same. Never zeroes `apiKeySecret`.
+ */
+export const mintApiKeyFrom = async (
+  dek: Uint8Array,
+  vaultVersion: number,
+  apiKeyId: string,
+  apiKeySecret: Uint8Array,
 ): Promise<TMintedApiKey> => {
-  const apiKeyId = newApiKeyId();
-  const apiKeySecret = randomBytes(OPENLLM_API_KEY_SECRET_BYTES);
+  if (apiKeySecret.length !== OPENLLM_API_KEY_SECRET_BYTES) {
+    throw new Error("API key secret must be 32 bytes");
+  }
   const wrapKey = await deriveApiWrapKey(apiKeySecret, apiKeyId);
   try {
     const nonce = randomBytes(NONCE_BYTES);

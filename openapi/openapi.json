@@ -26842,6 +26842,16 @@
                                 }
                               ]
                             },
+                            "subject_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "unlock_sent": {
                               "type": "boolean"
                             },
@@ -26899,6 +26909,7 @@
                             "failure_code",
                             "vault_key_id",
                             "key_id",
+                            "subject_id",
                             "unlock_sent",
                             "boot",
                             "created_at",
@@ -27408,6 +27419,16 @@
                                 }
                               ]
                             },
+                            "subject_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "unlock_sent": {
                               "type": "boolean"
                             },
@@ -27465,6 +27486,7 @@
                             "failure_code",
                             "vault_key_id",
                             "key_id",
+                            "subject_id",
                             "unlock_sent",
                             "boot",
                             "created_at",
@@ -27580,6 +27602,16 @@
                                 }
                               ]
                             },
+                            "subject_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "unlock_sent": {
                               "type": "boolean"
                             },
@@ -27637,6 +27669,7 @@
                             "failure_code",
                             "vault_key_id",
                             "key_id",
+                            "subject_id",
                             "unlock_sent",
                             "boot",
                             "created_at",
@@ -28157,6 +28190,16 @@
                                 }
                               ]
                             },
+                            "subject_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "unlock_sent": {
                               "type": "boolean"
                             },
@@ -28214,6 +28257,7 @@
                             "failure_code",
                             "vault_key_id",
                             "key_id",
+                            "subject_id",
                             "unlock_sent",
                             "boot",
                             "created_at",
@@ -28734,6 +28778,16 @@
                                 }
                               ]
                             },
+                            "subject_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "unlock_sent": {
                               "type": "boolean"
                             },
@@ -28791,6 +28845,7 @@
                             "failure_code",
                             "vault_key_id",
                             "key_id",
+                            "subject_id",
                             "unlock_sent",
                             "boot",
                             "created_at",
@@ -29311,6 +29366,16 @@
                                 }
                               ]
                             },
+                            "subject_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "unlock_sent": {
                               "type": "boolean"
                             },
@@ -29368,6 +29433,7 @@
                             "failure_code",
                             "vault_key_id",
                             "key_id",
+                            "subject_id",
                             "unlock_sent",
                             "boot",
                             "created_at",
