@@ -26870,6 +26870,9 @@
                             "unlock_sent": {
                               "type": "boolean"
                             },
+                            "has_machine": {
+                              "type": "boolean"
+                            },
                             "boot": {
                               "anyOf": [
                                 {
@@ -26927,6 +26930,7 @@
                             "reset_epoch",
                             "subject_id",
                             "unlock_sent",
+                            "has_machine",
                             "boot",
                             "created_at",
                             "updated_at"
@@ -27465,6 +27469,9 @@
                             "unlock_sent": {
                               "type": "boolean"
                             },
+                            "has_machine": {
+                              "type": "boolean"
+                            },
                             "boot": {
                               "anyOf": [
                                 {
@@ -27522,6 +27529,7 @@
                             "reset_epoch",
                             "subject_id",
                             "unlock_sent",
+                            "has_machine",
                             "boot",
                             "created_at",
                             "updated_at"
@@ -27666,6 +27674,9 @@
                             "unlock_sent": {
                               "type": "boolean"
                             },
+                            "has_machine": {
+                              "type": "boolean"
+                            },
                             "boot": {
                               "anyOf": [
                                 {
@@ -27723,6 +27734,7 @@
                             "reset_epoch",
                             "subject_id",
                             "unlock_sent",
+                            "has_machine",
                             "boot",
                             "created_at",
                             "updated_at"
@@ -28272,6 +28284,9 @@
                             "unlock_sent": {
                               "type": "boolean"
                             },
+                            "has_machine": {
+                              "type": "boolean"
+                            },
                             "boot": {
                               "anyOf": [
                                 {
@@ -28329,6 +28344,7 @@
                             "reset_epoch",
                             "subject_id",
                             "unlock_sent",
+                            "has_machine",
                             "boot",
                             "created_at",
                             "updated_at"
@@ -28878,6 +28894,9 @@
                             "unlock_sent": {
                               "type": "boolean"
                             },
+                            "has_machine": {
+                              "type": "boolean"
+                            },
                             "boot": {
                               "anyOf": [
                                 {
@@ -28935,6 +28954,7 @@
                             "reset_epoch",
                             "subject_id",
                             "unlock_sent",
+                            "has_machine",
                             "boot",
                             "created_at",
                             "updated_at"
@@ -29484,6 +29504,9 @@
                             "unlock_sent": {
                               "type": "boolean"
                             },
+                            "has_machine": {
+                              "type": "boolean"
+                            },
                             "boot": {
                               "anyOf": [
                                 {
@@ -29541,6 +29564,7 @@
                             "reset_epoch",
                             "subject_id",
                             "unlock_sent",
+                            "has_machine",
                             "boot",
                             "created_at",
                             "updated_at"
