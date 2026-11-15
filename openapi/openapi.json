@@ -26794,21 +26794,6 @@
                                 "deleted"
                               ]
                             },
-                            "generation": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "Infinity",
-                                    "-Infinity",
-                                    "NaN"
-                                  ]
-                                }
-                              ]
-                            },
                             "public_ipv4": {
                               "anyOf": [
                                 {
@@ -26828,9 +26813,6 @@
                                   "type": "null"
                                 }
                               ]
-                            },
-                            "vault_key_id": {
-                              "type": "string"
                             },
                             "key_id": {
                               "anyOf": [
@@ -26912,9 +26894,6 @@
                                 }
                               ]
                             },
-                            "created_at": {
-                              "type": "string"
-                            },
                             "updated_at": {
                               "type": "string"
                             }
@@ -26922,17 +26901,14 @@
                           "required": [
                             "id",
                             "state",
-                            "generation",
                             "public_ipv4",
                             "failure_code",
-                            "vault_key_id",
                             "key_id",
                             "reset_epoch",
                             "subject_id",
                             "unlock_sent",
                             "has_machine",
                             "boot",
-                            "created_at",
                             "updated_at"
                           ],
                           "additionalProperties": false
@@ -27393,21 +27369,6 @@
                                 "deleted"
                               ]
                             },
-                            "generation": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "Infinity",
-                                    "-Infinity",
-                                    "NaN"
-                                  ]
-                                }
-                              ]
-                            },
                             "public_ipv4": {
                               "anyOf": [
                                 {
@@ -27427,9 +27388,6 @@
                                   "type": "null"
                                 }
                               ]
-                            },
-                            "vault_key_id": {
-                              "type": "string"
                             },
                             "key_id": {
                               "anyOf": [
@@ -27511,9 +27469,6 @@
                                 }
                               ]
                             },
-                            "created_at": {
-                              "type": "string"
-                            },
                             "updated_at": {
                               "type": "string"
                             }
@@ -27521,17 +27476,14 @@
                           "required": [
                             "id",
                             "state",
-                            "generation",
                             "public_ipv4",
                             "failure_code",
-                            "vault_key_id",
                             "key_id",
                             "reset_epoch",
                             "subject_id",
                             "unlock_sent",
                             "has_machine",
                             "boot",
-                            "created_at",
                             "updated_at"
                           ],
                           "additionalProperties": false
@@ -27598,21 +27550,6 @@
                                 "deleted"
                               ]
                             },
-                            "generation": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "Infinity",
-                                    "-Infinity",
-                                    "NaN"
-                                  ]
-                                }
-                              ]
-                            },
                             "public_ipv4": {
                               "anyOf": [
                                 {
@@ -27632,9 +27569,6 @@
                                   "type": "null"
                                 }
                               ]
-                            },
-                            "vault_key_id": {
-                              "type": "string"
                             },
                             "key_id": {
                               "anyOf": [
@@ -27716,9 +27650,6 @@
                                 }
                               ]
                             },
-                            "created_at": {
-                              "type": "string"
-                            },
                             "updated_at": {
                               "type": "string"
                             }
@@ -27726,17 +27657,14 @@
                           "required": [
                             "id",
                             "state",
-                            "generation",
                             "public_ipv4",
                             "failure_code",
-                            "vault_key_id",
                             "key_id",
                             "reset_epoch",
                             "subject_id",
                             "unlock_sent",
                             "has_machine",
                             "boot",
-                            "created_at",
                             "updated_at"
                           ],
                           "additionalProperties": false
@@ -28208,21 +28136,6 @@
                                 "deleted"
                               ]
                             },
-                            "generation": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "Infinity",
-                                    "-Infinity",
-                                    "NaN"
-                                  ]
-                                }
-                              ]
-                            },
                             "public_ipv4": {
                               "anyOf": [
                                 {
@@ -28242,9 +28155,6 @@
                                   "type": "null"
                                 }
                               ]
-                            },
-                            "vault_key_id": {
-                              "type": "string"
                             },
                             "key_id": {
                               "anyOf": [
@@ -28326,9 +28236,6 @@
                                 }
                               ]
                             },
-                            "created_at": {
-                              "type": "string"
-                            },
                             "updated_at": {
                               "type": "string"
                             }
@@ -28336,17 +28243,14 @@
                           "required": [
                             "id",
                             "state",
-                            "generation",
                             "public_ipv4",
                             "failure_code",
-                            "vault_key_id",
                             "key_id",
                             "reset_epoch",
                             "subject_id",
                             "unlock_sent",
                             "has_machine",
                             "boot",
-                            "created_at",
                             "updated_at"
                           ],
                           "additionalProperties": false
@@ -28818,21 +28722,6 @@
                                 "deleted"
                               ]
                             },
-                            "generation": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "Infinity",
-                                    "-Infinity",
-                                    "NaN"
-                                  ]
-                                }
-                              ]
-                            },
                             "public_ipv4": {
                               "anyOf": [
                                 {
@@ -28852,9 +28741,6 @@
                                   "type": "null"
                                 }
                               ]
-                            },
-                            "vault_key_id": {
-                              "type": "string"
                             },
                             "key_id": {
                               "anyOf": [
@@ -28936,9 +28822,6 @@
                                 }
                               ]
                             },
-                            "created_at": {
-                              "type": "string"
-                            },
                             "updated_at": {
                               "type": "string"
                             }
@@ -28946,17 +28829,14 @@
                           "required": [
                             "id",
                             "state",
-                            "generation",
                             "public_ipv4",
                             "failure_code",
-                            "vault_key_id",
                             "key_id",
                             "reset_epoch",
                             "subject_id",
                             "unlock_sent",
                             "has_machine",
                             "boot",
-                            "created_at",
                             "updated_at"
                           ],
                           "additionalProperties": false
@@ -29428,21 +29308,6 @@
                                 "deleted"
                               ]
                             },
-                            "generation": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "Infinity",
-                                    "-Infinity",
-                                    "NaN"
-                                  ]
-                                }
-                              ]
-                            },
                             "public_ipv4": {
                               "anyOf": [
                                 {
@@ -29462,9 +29327,6 @@
                                   "type": "null"
                                 }
                               ]
-                            },
-                            "vault_key_id": {
-                              "type": "string"
                             },
                             "key_id": {
                               "anyOf": [
@@ -29546,9 +29408,6 @@
                                 }
                               ]
                             },
-                            "created_at": {
-                              "type": "string"
-                            },
                             "updated_at": {
                               "type": "string"
                             }
@@ -29556,17 +29415,14 @@
                           "required": [
                             "id",
                             "state",
-                            "generation",
                             "public_ipv4",
                             "failure_code",
-                            "vault_key_id",
                             "key_id",
                             "reset_epoch",
                             "subject_id",
                             "unlock_sent",
                             "has_machine",
                             "boot",
-                            "created_at",
                             "updated_at"
                           ],
                           "additionalProperties": false
