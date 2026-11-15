@@ -7,6 +7,8 @@
  * - the box's API key secret (32 bytes),
  * - the home key that opens its encrypted home (LUKS).
  *
+ * all also depend on the box's reset epoch (see `saltOf`).
+ *
  * Each is `HKDF-SHA256(seed, utf8(subject id), <own info>, n)`, so they never
  * coincide. The device-control seed is itself `HKDF(vault seed)`, held by an
  * unlocked browser and by nothing else: no API key, daemon or server. So any
@@ -32,9 +34,23 @@ export const ROUTEBOX_HOME_HKDF_INFO = "openllm-routebox-home-v2";
 export const ROUTEBOX_KEY_ID_HKDF_INFO = "openllm-routebox-key-id-v1";
 export const ROUTEBOX_KEY_SECRET_HKDF_INFO = "openllm-routebox-key-secret-v1";
 
+/**
+ * The salt: the subject id and the box's reset epoch. A Reset increments the
+ * epoch, so it derives a NEW key id, secret and home key (an old `sk-llm` is
+ * never re-minted); a takeover reads the epoch from the machine's name and so
+ * rebuilds the same ones.
+ */
+const saltOf = (subjectId: string, epoch: number): Uint8Array => {
+  if (!Number.isInteger(epoch) || epoch < 0) {
+    throw new Error("Routebox reset epoch must be a non-negative integer");
+  }
+  return new TextEncoder().encode(`${subjectId}|e${epoch}`);
+};
+
 const derive = async (
   controlSeed: Uint8Array,
   subjectId: string,
+  epoch: number,
   info: string,
   length: number,
 ): Promise<Uint8Array> => {
@@ -43,29 +59,27 @@ const derive = async (
   }
   if (subjectId.length === 0)
     throw new Error("Routebox key needs a subject id");
-  return hkdfSha256(
-    controlSeed,
-    new TextEncoder().encode(subjectId),
-    info,
-    length,
-  );
+  return hkdfSha256(controlSeed, saltOf(subjectId, epoch), info, length);
 };
 
 /** Derive the box's home key; the caller must zero the returned bytes. */
 export const deriveRouteboxHomeKey = (
   controlSeed: Uint8Array,
   subjectId: string,
+  epoch: number,
 ): Promise<Uint8Array> =>
-  derive(controlSeed, subjectId, ROUTEBOX_HOME_HKDF_INFO, 32);
+  derive(controlSeed, subjectId, epoch, ROUTEBOX_HOME_HKDF_INFO, 32);
 
 /** The box's API key id, in the ordinary base64url key-id encoding. */
 export const deriveRouteboxKeyId = async (
   controlSeed: Uint8Array,
   subjectId: string,
+  epoch: number,
 ): Promise<string> => {
   const bytes = await derive(
     controlSeed,
     subjectId,
+    epoch,
     ROUTEBOX_KEY_ID_HKDF_INFO,
     OPENLLM_API_KEY_ID_BYTES,
   );
@@ -80,10 +94,12 @@ export const deriveRouteboxKeyId = async (
 export const deriveRouteboxKeySecret = (
   controlSeed: Uint8Array,
   subjectId: string,
+  epoch: number,
 ): Promise<Uint8Array> =>
   derive(
     controlSeed,
     subjectId,
+    epoch,
     ROUTEBOX_KEY_SECRET_HKDF_INFO,
     OPENLLM_API_KEY_SECRET_BYTES,
   );
@@ -98,9 +114,10 @@ export const mintRouteboxApiKey = async (
   vaultVersion: number,
   controlSeed: Uint8Array,
   subjectId: string,
+  epoch: number,
 ): Promise<TMintedApiKey> => {
-  const id = await deriveRouteboxKeyId(controlSeed, subjectId);
-  const secret = await deriveRouteboxKeySecret(controlSeed, subjectId);
+  const id = await deriveRouteboxKeyId(controlSeed, subjectId, epoch);
+  const secret = await deriveRouteboxKeySecret(controlSeed, subjectId, epoch);
   try {
     return await mintApiKeyFrom(dek, vaultVersion, id, secret);
   } finally {

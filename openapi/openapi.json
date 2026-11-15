@@ -26842,6 +26842,21 @@
                                 }
                               ]
                             },
+                            "reset_epoch": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
                             "subject_id": {
                               "anyOf": [
                                 {
@@ -26909,6 +26924,7 @@
                             "failure_code",
                             "vault_key_id",
                             "key_id",
+                            "reset_epoch",
                             "subject_id",
                             "unlock_sent",
                             "boot",
@@ -26927,7 +26943,8 @@
                         {
                           "type": "string",
                           "enum": [
-                            "machine_gone"
+                            "machine_gone",
+                            "no_machine_available"
                           ]
                         },
                         {
@@ -27419,6 +27436,21 @@
                                 }
                               ]
                             },
+                            "reset_epoch": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
                             "subject_id": {
                               "anyOf": [
                                 {
@@ -27486,6 +27518,7 @@
                             "failure_code",
                             "vault_key_id",
                             "key_id",
+                            "reset_epoch",
                             "subject_id",
                             "unlock_sent",
                             "boot",
@@ -27504,7 +27537,8 @@
                         {
                           "type": "string",
                           "enum": [
-                            "machine_gone"
+                            "machine_gone",
+                            "no_machine_available"
                           ]
                         },
                         {
@@ -27602,6 +27636,21 @@
                                 }
                               ]
                             },
+                            "reset_epoch": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
                             "subject_id": {
                               "anyOf": [
                                 {
@@ -27669,6 +27718,7 @@
                             "failure_code",
                             "vault_key_id",
                             "key_id",
+                            "reset_epoch",
                             "subject_id",
                             "unlock_sent",
                             "boot",
@@ -27687,7 +27737,8 @@
                         {
                           "type": "string",
                           "enum": [
-                            "machine_gone"
+                            "machine_gone",
+                            "no_machine_available"
                           ]
                         },
                         {
@@ -28190,6 +28241,21 @@
                                 }
                               ]
                             },
+                            "reset_epoch": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
                             "subject_id": {
                               "anyOf": [
                                 {
@@ -28257,6 +28323,7 @@
                             "failure_code",
                             "vault_key_id",
                             "key_id",
+                            "reset_epoch",
                             "subject_id",
                             "unlock_sent",
                             "boot",
@@ -28275,7 +28342,8 @@
                         {
                           "type": "string",
                           "enum": [
-                            "machine_gone"
+                            "machine_gone",
+                            "no_machine_available"
                           ]
                         },
                         {
@@ -28778,6 +28846,21 @@
                                 }
                               ]
                             },
+                            "reset_epoch": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
                             "subject_id": {
                               "anyOf": [
                                 {
@@ -28845,6 +28928,7 @@
                             "failure_code",
                             "vault_key_id",
                             "key_id",
+                            "reset_epoch",
                             "subject_id",
                             "unlock_sent",
                             "boot",
@@ -28863,7 +28947,8 @@
                         {
                           "type": "string",
                           "enum": [
-                            "machine_gone"
+                            "machine_gone",
+                            "no_machine_available"
                           ]
                         },
                         {
@@ -29366,6 +29451,21 @@
                                 }
                               ]
                             },
+                            "reset_epoch": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
                             "subject_id": {
                               "anyOf": [
                                 {
@@ -29433,6 +29533,7 @@
                             "failure_code",
                             "vault_key_id",
                             "key_id",
+                            "reset_epoch",
                             "subject_id",
                             "unlock_sent",
                             "boot",
@@ -29451,7 +29552,8 @@
                         {
                           "type": "string",
                           "enum": [
-                            "machine_gone"
+                            "machine_gone",
+                            "no_machine_available"
                           ]
                         },
                         {
