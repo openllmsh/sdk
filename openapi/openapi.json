@@ -26944,6 +26944,7 @@
                           "type": "string",
                           "enum": [
                             "machine_gone",
+                            "machine_moved",
                             "no_machine_available"
                           ]
                         },
@@ -27538,6 +27539,7 @@
                           "type": "string",
                           "enum": [
                             "machine_gone",
+                            "machine_moved",
                             "no_machine_available"
                           ]
                         },
@@ -27738,6 +27740,7 @@
                           "type": "string",
                           "enum": [
                             "machine_gone",
+                            "machine_moved",
                             "no_machine_available"
                           ]
                         },
@@ -28343,6 +28346,7 @@
                           "type": "string",
                           "enum": [
                             "machine_gone",
+                            "machine_moved",
                             "no_machine_available"
                           ]
                         },
@@ -28948,6 +28952,7 @@
                           "type": "string",
                           "enum": [
                             "machine_gone",
+                            "machine_moved",
                             "no_machine_available"
                           ]
                         },
@@ -29553,6 +29558,7 @@
                           "type": "string",
                           "enum": [
                             "machine_gone",
+                            "machine_moved",
                             "no_machine_available"
                           ]
                         },
