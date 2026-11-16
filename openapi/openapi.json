@@ -26849,6 +26849,9 @@
                                 }
                               ]
                             },
+                            "home_sent": {
+                              "type": "boolean"
+                            },
                             "unlock_sent": {
                               "type": "boolean"
                             },
@@ -26880,12 +26883,54 @@
                                     },
                                     "challenge": {
                                       "type": "string"
+                                    },
+                                    "proof": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "signed"
+                                              ]
+                                            },
+                                            "signature": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "kind",
+                                            "signature"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "fresh"
+                                              ]
+                                            }
+                                          },
+                                          "required": [
+                                            "kind"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     }
                                   },
                                   "required": [
                                     "generation",
                                     "pubkey",
-                                    "challenge"
+                                    "challenge",
+                                    "proof"
                                   ],
                                   "additionalProperties": false
                                 },
@@ -26906,6 +26951,7 @@
                             "key_id",
                             "reset_epoch",
                             "subject_id",
+                            "home_sent",
                             "unlock_sent",
                             "has_machine",
                             "boot",
@@ -27424,6 +27470,9 @@
                                 }
                               ]
                             },
+                            "home_sent": {
+                              "type": "boolean"
+                            },
                             "unlock_sent": {
                               "type": "boolean"
                             },
@@ -27455,12 +27504,54 @@
                                     },
                                     "challenge": {
                                       "type": "string"
+                                    },
+                                    "proof": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "signed"
+                                              ]
+                                            },
+                                            "signature": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "kind",
+                                            "signature"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "fresh"
+                                              ]
+                                            }
+                                          },
+                                          "required": [
+                                            "kind"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     }
                                   },
                                   "required": [
                                     "generation",
                                     "pubkey",
-                                    "challenge"
+                                    "challenge",
+                                    "proof"
                                   ],
                                   "additionalProperties": false
                                 },
@@ -27481,6 +27572,7 @@
                             "key_id",
                             "reset_epoch",
                             "subject_id",
+                            "home_sent",
                             "unlock_sent",
                             "has_machine",
                             "boot",
@@ -27605,6 +27697,9 @@
                                 }
                               ]
                             },
+                            "home_sent": {
+                              "type": "boolean"
+                            },
                             "unlock_sent": {
                               "type": "boolean"
                             },
@@ -27636,12 +27731,54 @@
                                     },
                                     "challenge": {
                                       "type": "string"
+                                    },
+                                    "proof": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "signed"
+                                              ]
+                                            },
+                                            "signature": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "kind",
+                                            "signature"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "fresh"
+                                              ]
+                                            }
+                                          },
+                                          "required": [
+                                            "kind"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     }
                                   },
                                   "required": [
                                     "generation",
                                     "pubkey",
-                                    "challenge"
+                                    "challenge",
+                                    "proof"
                                   ],
                                   "additionalProperties": false
                                 },
@@ -27662,6 +27799,7 @@
                             "key_id",
                             "reset_epoch",
                             "subject_id",
+                            "home_sent",
                             "unlock_sent",
                             "has_machine",
                             "boot",
@@ -28191,6 +28329,9 @@
                                 }
                               ]
                             },
+                            "home_sent": {
+                              "type": "boolean"
+                            },
                             "unlock_sent": {
                               "type": "boolean"
                             },
@@ -28222,12 +28363,54 @@
                                     },
                                     "challenge": {
                                       "type": "string"
+                                    },
+                                    "proof": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "signed"
+                                              ]
+                                            },
+                                            "signature": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "kind",
+                                            "signature"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "fresh"
+                                              ]
+                                            }
+                                          },
+                                          "required": [
+                                            "kind"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     }
                                   },
                                   "required": [
                                     "generation",
                                     "pubkey",
-                                    "challenge"
+                                    "challenge",
+                                    "proof"
                                   ],
                                   "additionalProperties": false
                                 },
@@ -28248,6 +28431,7 @@
                             "key_id",
                             "reset_epoch",
                             "subject_id",
+                            "home_sent",
                             "unlock_sent",
                             "has_machine",
                             "boot",
@@ -28777,6 +28961,9 @@
                                 }
                               ]
                             },
+                            "home_sent": {
+                              "type": "boolean"
+                            },
                             "unlock_sent": {
                               "type": "boolean"
                             },
@@ -28808,12 +28995,54 @@
                                     },
                                     "challenge": {
                                       "type": "string"
+                                    },
+                                    "proof": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "signed"
+                                              ]
+                                            },
+                                            "signature": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "kind",
+                                            "signature"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "fresh"
+                                              ]
+                                            }
+                                          },
+                                          "required": [
+                                            "kind"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     }
                                   },
                                   "required": [
                                     "generation",
                                     "pubkey",
-                                    "challenge"
+                                    "challenge",
+                                    "proof"
                                   ],
                                   "additionalProperties": false
                                 },
@@ -28834,6 +29063,7 @@
                             "key_id",
                             "reset_epoch",
                             "subject_id",
+                            "home_sent",
                             "unlock_sent",
                             "has_machine",
                             "boot",
@@ -29363,6 +29593,9 @@
                                 }
                               ]
                             },
+                            "home_sent": {
+                              "type": "boolean"
+                            },
                             "unlock_sent": {
                               "type": "boolean"
                             },
@@ -29394,12 +29627,54 @@
                                     },
                                     "challenge": {
                                       "type": "string"
+                                    },
+                                    "proof": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "signed"
+                                              ]
+                                            },
+                                            "signature": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "kind",
+                                            "signature"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "fresh"
+                                              ]
+                                            }
+                                          },
+                                          "required": [
+                                            "kind"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     }
                                   },
                                   "required": [
                                     "generation",
                                     "pubkey",
-                                    "challenge"
+                                    "challenge",
+                                    "proof"
                                   ],
                                   "additionalProperties": false
                                 },
@@ -29420,6 +29695,7 @@
                             "key_id",
                             "reset_epoch",
                             "subject_id",
+                            "home_sent",
                             "unlock_sent",
                             "has_machine",
                             "boot",
@@ -30277,6 +30553,13 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "phase": {
+                    "type": "string",
+                    "enum": [
+                      "home",
+                      "key"
+                    ]
+                  },
                   "boot_generation": {
                     "anyOf": [
                       {
@@ -30368,6 +30651,7 @@
                   }
                 },
                 "required": [
+                  "phase",
                   "boot_generation",
                   "envelope"
                 ],

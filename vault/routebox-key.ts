@@ -5,7 +5,10 @@
  *
  * - the box's API key id (10 bytes, the normal key-id encoding),
  * - the box's API key secret (32 bytes),
- * - the home key that opens its encrypted home (LUKS).
+ * - the home key that opens its encrypted home (LUKS),
+ * - the box's identity: an Ed25519 seed the box keeps inside that home, with
+ *   which it proves on every later boot that it is the machine this vault set
+ *   up (`routebox-seal.ts`, the proof).
  *
  * all also depend on the box's reset epoch (see `saltOf`).
  *
@@ -27,12 +30,14 @@ import {
 } from "@openllmsh/sdk/protocol";
 import type { TMintedApiKey } from "./api-key";
 import { mintApiKeyFrom } from "./api-key";
-import { hkdfSha256, toB64Url, zero } from "./crypto";
+import { getPublicKeyAsync } from "@noble/ed25519";
+import { hkdfSha256, toB64, toB64Url, zero } from "./crypto";
 import { DEVICE_CONTROL_SEED_BYTES } from "./device-control";
 
 export const ROUTEBOX_HOME_HKDF_INFO = "openllm-routebox-home-v2";
 export const ROUTEBOX_KEY_ID_HKDF_INFO = "openllm-routebox-key-id-v1";
 export const ROUTEBOX_KEY_SECRET_HKDF_INFO = "openllm-routebox-key-secret-v1";
+export const ROUTEBOX_IDENTITY_HKDF_INFO = "openllm-routebox-identity-v1";
 
 /**
  * The salt: the subject id and the box's reset epoch. A Reset increments the
@@ -122,5 +127,31 @@ export const mintRouteboxApiKey = async (
     return await mintApiKeyFrom(dek, vaultVersion, id, secret);
   } finally {
     zero(secret);
+  }
+};
+
+/**
+ * The box's identity seed (an Ed25519 private key, RFC 8032 seed form). Sent
+ * to the box once, when it is set up, and kept only inside its encrypted home;
+ * the caller must zero the returned bytes.
+ */
+export const deriveRouteboxIdentitySeed = (
+  controlSeed: Uint8Array,
+  subjectId: string,
+  epoch: number,
+): Promise<Uint8Array> =>
+  derive(controlSeed, subjectId, epoch, ROUTEBOX_IDENTITY_HKDF_INFO, 32);
+
+/** The identity's public key (base64 of the raw 32 bytes): what a proof must verify against. */
+export const deriveRouteboxIdentityPublicKey = async (
+  controlSeed: Uint8Array,
+  subjectId: string,
+  epoch: number,
+): Promise<string> => {
+  const seed = await deriveRouteboxIdentitySeed(controlSeed, subjectId, epoch);
+  try {
+    return toB64(await getPublicKeyAsync(seed));
+  } finally {
+    zero(seed);
   }
 };
