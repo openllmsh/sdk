@@ -26824,6 +26824,9 @@
                                 }
                               ]
                             },
+                            "set_up": {
+                              "type": "boolean"
+                            },
                             "reset_epoch": {
                               "anyOf": [
                                 {
@@ -26949,6 +26952,7 @@
                             "public_ipv4",
                             "failure_code",
                             "key_id",
+                            "set_up",
                             "reset_epoch",
                             "subject_id",
                             "home_sent",
@@ -27445,6 +27449,9 @@
                                 }
                               ]
                             },
+                            "set_up": {
+                              "type": "boolean"
+                            },
                             "reset_epoch": {
                               "anyOf": [
                                 {
@@ -27570,6 +27577,7 @@
                             "public_ipv4",
                             "failure_code",
                             "key_id",
+                            "set_up",
                             "reset_epoch",
                             "subject_id",
                             "home_sent",
@@ -27672,6 +27680,9 @@
                                 }
                               ]
                             },
+                            "set_up": {
+                              "type": "boolean"
+                            },
                             "reset_epoch": {
                               "anyOf": [
                                 {
@@ -27797,6 +27808,7 @@
                             "public_ipv4",
                             "failure_code",
                             "key_id",
+                            "set_up",
                             "reset_epoch",
                             "subject_id",
                             "home_sent",
@@ -28304,6 +28316,9 @@
                                 }
                               ]
                             },
+                            "set_up": {
+                              "type": "boolean"
+                            },
                             "reset_epoch": {
                               "anyOf": [
                                 {
@@ -28429,6 +28444,7 @@
                             "public_ipv4",
                             "failure_code",
                             "key_id",
+                            "set_up",
                             "reset_epoch",
                             "subject_id",
                             "home_sent",
@@ -28936,6 +28952,9 @@
                                 }
                               ]
                             },
+                            "set_up": {
+                              "type": "boolean"
+                            },
                             "reset_epoch": {
                               "anyOf": [
                                 {
@@ -29061,6 +29080,7 @@
                             "public_ipv4",
                             "failure_code",
                             "key_id",
+                            "set_up",
                             "reset_epoch",
                             "subject_id",
                             "home_sent",
@@ -29568,6 +29588,9 @@
                                 }
                               ]
                             },
+                            "set_up": {
+                              "type": "boolean"
+                            },
                             "reset_epoch": {
                               "anyOf": [
                                 {
@@ -29693,6 +29716,7 @@
                             "public_ipv4",
                             "failure_code",
                             "key_id",
+                            "set_up",
                             "reset_epoch",
                             "subject_id",
                             "home_sent",
