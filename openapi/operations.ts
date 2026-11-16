@@ -1017,6 +1017,20 @@ export const API_OPERATIONS: readonly TApiOperation[] = [
     "hasBody": true
   },
   {
+    "id": "routebox.withhold",
+    "method": "post",
+    "path": "/routebox/{id}/withhold",
+    "summary": "",
+    "tags": [
+      "routebox"
+    ],
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "hasBody": true
+  },
+  {
     "id": "sessions.list",
     "method": "get",
     "path": "/sessions",
