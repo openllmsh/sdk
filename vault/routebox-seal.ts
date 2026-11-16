@@ -149,6 +149,17 @@ export const signRouteboxProof = async (
 ): Promise<string> =>
   toB64(await signAsync(routeboxProofMessage(binding), identitySeed));
 
+const allowListed = (
+  phase: TRouteboxUnlockPhase,
+  unlock: TRouteboxHomeUnlock | TRouteboxKeyUnlock,
+): TRouteboxHomeUnlock | TRouteboxKeyUnlock => {
+  if (phase === "home") {
+    return { home_key: (unlock as TRouteboxHomeUnlock).home_key };
+  }
+  const { api_key, identity_seed } = unlock as TRouteboxKeyUnlock;
+  return identity_seed === undefined ? { api_key } : { api_key, identity_seed };
+};
+
 /** Seal one phase of the unlock to the boot in `binding`. */
 export const sealRouteboxUnlock = async <TPhase extends TRouteboxUnlockPhase>(
   phase: TPhase,
@@ -156,7 +167,9 @@ export const sealRouteboxUnlock = async <TPhase extends TRouteboxUnlockPhase>(
   unlock: TRouteboxUnlockFor<TPhase>,
 ): Promise<TRouteboxEnvelope> => {
   raw32(binding.challengeB64, "challenge");
-  const plaintext = encoder.encode(JSON.stringify(unlock));
+  // Only the phase's own fields are sealed: a value typed wider than its
+  // phase (a variable, not a literal) never carries extras to the boot.
+  const plaintext = encoder.encode(JSON.stringify(allowListed(phase, unlock)));
   try {
     return await sealX25519({
       domain: ROUTEBOX_SEAL_DOMAIN,
