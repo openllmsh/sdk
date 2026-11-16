@@ -36,13 +36,13 @@
 
 import { signAsync, verifyAsync } from "@noble/ed25519";
 import { fromB64, toB64, zero } from "./crypto";
+import type { TRouteboxUnlockPhase } from "./routebox-unlock-phase";
 import { openX25519, sealX25519 } from "./x25519-seal";
 
 export const ROUTEBOX_SEAL_DOMAIN = "openllm-routebox-seal-v1";
 export const ROUTEBOX_PROOF_DOMAIN = "openllm-routebox-proof-v1";
 
-/** Which half of a boot's unlock an envelope carries. */
-export type TRouteboxUnlockPhase = "home" | "key";
+export type { TRouteboxUnlockPhase };
 
 export type TRouteboxSealBinding = {
   readonly userId: string;
