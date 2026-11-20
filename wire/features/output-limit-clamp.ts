@@ -40,6 +40,27 @@ export const clampOutputLimitFields = (
   return result;
 };
 
+/**
+ * A copy of `body` with every output field it already carries at most
+ * `limit`; never adds one (a Codex body 400s on a field it didn't send).
+ */
+export const lowerPresentOutputLimitFields = (
+  body: unknown,
+  limit: number,
+): unknown => {
+  if (body === null || typeof body !== "object" || Array.isArray(body))
+    return body;
+  const record = body as Record<string, unknown>;
+  let result: Record<string, unknown> | null = null;
+  for (const key of OUTPUT_FIELDS) {
+    const value = record[key];
+    if (typeof value !== "number" || value <= limit) continue;
+    result ??= { ...record };
+    result[key] = limit;
+  }
+  return result ?? body;
+};
+
 export const isOutputLimitSurface = (
   surface: string,
 ): surface is TOutputLimitSurface =>
