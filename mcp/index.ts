@@ -22,6 +22,7 @@ export {
 export type {
   TBeginMarketplaceLoadOptions,
   TCreateMcpServerOptions,
+  THostTool,
   TLaunchConnected,
   TMarketplaceLoad,
   TMcpGatewayConfig,

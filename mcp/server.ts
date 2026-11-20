@@ -6,7 +6,10 @@
  * module never touches stdio, CLI onboarding, or local-auth tools.
  */
 
-import type { CallToolResult } from "@modelcontextprotocol/server";
+import type {
+  CallToolResult,
+  RegisteredTool,
+} from "@modelcontextprotocol/server";
 import { fromJsonSchema, McpServer } from "@modelcontextprotocol/server";
 import type { TPermission } from "@openllmsh/sdk/protocol";
 import { Permission } from "@openllmsh/sdk/protocol";
@@ -30,6 +33,17 @@ export const parseKeyPermissions = (
       )
     : undefined;
 
+import type { TLookupEntry } from "./tool-lookup";
+import {
+  compactToolSchema,
+  findLookupEntries,
+  isMcpCoreTool,
+  lookupDetailsNote,
+  lookupGroups,
+  lookupToolSpecs,
+  MCP_LISTING_LIMITS,
+  parseLookupCall,
+} from "./tool-lookup";
 import type {
   TMarketplaceLaunch,
   TMarketplaceLaunchServer,
@@ -48,7 +62,6 @@ import {
 import {
   handleOpenllmTool,
   isFreeTierOnlyTool,
-  isMcpListedTool,
   openllmToolDefs,
   TRANSCRIPTION_TOOL_NAME,
 } from "./tools/openllm";
@@ -91,9 +104,149 @@ export type TCreateMcpServerOptions = {
    * gateway still enforces every call).
    */
   readonly permissions?: readonly TPermission[];
+  /** Host tools (e.g. the CLI's local-auth group), listed or deferred. */
+  readonly hostTools?: readonly THostTool[];
 };
 
-/** One registration path for both negotiated stdio eras and local tests. */
+type TToolAnnotations = {
+  readonly title?: string;
+  readonly readOnlyHint?: boolean;
+  readonly destructiveHint?: boolean;
+  readonly idempotentHint?: boolean;
+  readonly openWorldHint?: boolean;
+};
+
+/** A host-provided tool (e.g. the CLI's local-auth group). */
+export type THostTool = {
+  readonly name: string;
+  readonly description: string;
+  readonly inputSchema: Record<string, unknown>;
+  readonly annotations?: TToolAnnotations;
+  /** Listed on every request; otherwise found on demand. */
+  readonly listed: boolean;
+  readonly run: (args: Record<string, unknown>) => Promise<TToolResult>;
+};
+
+type TEntry = TLookupEntry & {
+  readonly annotations?: TToolAnnotations;
+  readonly run: (args: Record<string, unknown>) => Promise<CallToolResult>;
+};
+
+/** Per-server lookup state: what the find/call tools search and run. */
+type TLookupState = {
+  /** Tools reached only through {@link OPENLLM_API_CALL_TOOL}. */
+  readonly deferred: Map<string, TEntry>;
+  /** Listed tools whose schema was shortened: full text via find. */
+  readonly shortened: Map<string, TLookupEntry>;
+  readonly registered: Set<string>;
+  readonly find: RegisteredTool;
+};
+
+/** Memory tools an agent rarely needs up front. */
+const MEMORY_DEFERRED_TOOLS: ReadonlySet<string> = new Set(["whoAmI"]);
+
+const lookupStates = new WeakMap<McpServer, TLookupState>();
+
+const toolConfig = (
+  tool: TLookupEntry & { readonly annotations?: TToolAnnotations },
+): Parameters<McpServer["registerTool"]>[1] =>
+  ({
+    description: tool.description,
+    ...(tool.annotations === undefined
+      ? {}
+      : { annotations: tool.annotations }),
+    // MCP server overloads accept either Zod shapes or StandardSchemaV1;
+    // `fromJsonSchema` returns the latter. Cast through unknown to the
+    // registerTool config slot so we don't depend on a Zod-shaped overload.
+    inputSchema: fromJsonSchema<Record<string, unknown>>(tool.inputSchema),
+  }) as unknown as Parameters<McpServer["registerTool"]>[1];
+
+const errorResult = (text: string): TToolResult => ({
+  content: [{ type: "text", text }],
+  isError: true,
+});
+
+/** List `entry` (schema compacted) or defer it to the lookup tools. */
+const addEntry = (
+  server: McpServer,
+  state: TLookupState,
+  entry: TEntry,
+  listed: boolean,
+): void => {
+  state.registered.add(entry.name);
+  if (!listed) {
+    state.deferred.set(entry.name, entry);
+    return;
+  }
+  const compacted = compactToolSchema(
+    entry,
+    lookupDetailsNote,
+    MCP_LISTING_LIMITS,
+  );
+  if (compacted.shortened) state.shortened.set(entry.name, entry);
+  server.registerTool(
+    entry.name,
+    toolConfig({ ...compacted.tool, annotations: entry.annotations }),
+    (args: Record<string, unknown>) => entry.run(args),
+  );
+};
+
+const findDescription = (state: TLookupState): string =>
+  lookupToolSpecs(lookupGroups([...state.deferred.values()]))[0]?.description ??
+  "";
+
+/** Register the two lookup tools; returns the per-server state. */
+const registerLookupTools = (server: McpServer): TLookupState => {
+  const [findSpec, callSpec] = lookupToolSpecs([]);
+  if (findSpec === undefined || callSpec === undefined)
+    throw new Error("lookup tool specs missing");
+  const deferred = new Map<string, TEntry>();
+  const shortened = new Map<string, TLookupEntry>();
+  const find = server.registerTool(
+    findSpec.name,
+    toolConfig({ ...findSpec, annotations: { readOnlyHint: true } }),
+    async (args: Record<string, unknown>): Promise<TToolResult> => ({
+      content: [
+        {
+          type: "text",
+          text: findLookupEntries(
+            [...deferred.values(), ...shortened.values()],
+            typeof args.query === "string" ? args.query : "",
+          ),
+        },
+      ],
+    }),
+  );
+  server.registerTool(
+    callSpec.name,
+    toolConfig(callSpec),
+    async (args: Record<string, unknown>): Promise<CallToolResult> => {
+      const call = parseLookupCall(args, (name) => deferred.has(name));
+      if ("error" in call) return errorResult(call.error);
+      const entry = deferred.get(call.name);
+      if (entry === undefined) return errorResult(`Unknown tool: ${call.name}`);
+      return entry.run(call.arguments);
+    },
+  );
+  const state: TLookupState = {
+    deferred,
+    shortened,
+    registered: new Set([findSpec.name, callSpec.name]),
+    find,
+  };
+  lookupStates.set(server, state);
+  return state;
+};
+
+/**
+ * One registration path for both negotiated stdio eras and local tests.
+ *
+ * Only the tools a conversation uses are LISTED (`isMcpCoreTool`, host tools
+ * marked `listed`, the Memory integration), each schema compacted; every
+ * other permitted tool — account reads, the rest of a host group, other
+ * marketplace integrations — is found and run through the two lookup tools,
+ * so the listing stays small whatever is enabled.
+ */
 export const createMcpServer = ({
   version,
   groups,
@@ -102,133 +255,106 @@ export const createMcpServer = ({
   includeFreeTierOnlyTools = false,
   transcribe,
   permissions,
+  hostTools = [],
 }: TCreateMcpServerOptions): McpServer => {
   const held =
     permissions === undefined ? undefined : new Set<string>(permissions);
-  const mayCall = (name: string): boolean => {
-    if (held === undefined) return true;
-    const def = openllmToolDefs.find((tool) => tool.name === name);
-    return def !== undefined && held.has(def.permission);
-  };
-  const openllmTools = openllmToolDefs.filter((tool) => {
-    if (!mayCall(tool.name)) return false;
-    if (!includeFreeTierOnlyTools && isFreeTierOnlyTool(tool.name))
-      return false;
-    // Transcription needs a host-provided local-file handler.
-    if (tool.name === TRANSCRIPTION_TOOL_NAME && transcribe === undefined)
-      return false;
-    return true;
-  });
-  const tools = [...(groups.includes("openllm") ? openllmTools : [])];
+  const openllmTools = groups.includes("openllm")
+    ? openllmToolDefs.filter((tool) => {
+        if (held !== undefined && !held.has(tool.permission)) return false;
+        if (!includeFreeTierOnlyTools && isFreeTierOnlyTool(tool.name))
+          return false;
+        // Transcription needs a host-provided local-file handler.
+        if (tool.name === TRANSCRIPTION_TOOL_NAME && transcribe === undefined)
+          return false;
+        return true;
+      })
+    : [];
   const server = new McpServer(
     { name: "openllm", version },
     { capabilities: { tools: {} } },
   );
-  for (const tool of tools) {
+  const state = registerLookupTools(server);
+  for (const tool of openllmTools) {
     const name = tool.name;
-    const inputSchema: Record<string, unknown> = tool.inputSchema;
-    // MCP server overloads accept either Zod shapes or StandardSchemaV1;
-    // `fromJsonSchema` returns the latter. Cast through unknown to the
-    // registerTool config slot so we don't depend on a Zod-shaped overload.
-    const toolConfig = {
-      description: tool.description,
-      ...("annotations" in tool && tool.annotations !== undefined
-        ? {
-            annotations: tool.annotations as {
-              readonly title?: string;
-              readonly readOnlyHint?: boolean;
-              readonly destructiveHint?: boolean;
-              readonly idempotentHint?: boolean;
-              readonly openWorldHint?: boolean;
-            },
-          }
-        : {}),
-      inputSchema: fromJsonSchema<Record<string, unknown>>(inputSchema),
-    };
-    server.registerTool(
-      name,
-      toolConfig as unknown as Parameters<McpServer["registerTool"]>[1],
-      async (args: Record<string, unknown>): Promise<TToolResult> => {
-        if (
-          groups.includes("openllm") &&
-          isMcpListedTool(name) &&
-          mayCall(name) &&
-          (includeFreeTierOnlyTools || !isFreeTierOnlyTool(name))
-        ) {
+    addEntry(
+      server,
+      state,
+      {
+        name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        run: async (args) => {
           if (name === TRANSCRIPTION_TOOL_NAME) {
-            if (transcribe === undefined) {
-              return {
-                content: [
-                  {
-                    type: "text",
-                    text: "Transcription requires a host-provided transcribe handler",
-                  },
-                ],
-                isError: true,
-              };
-            }
+            if (transcribe === undefined)
+              return errorResult(
+                "Transcription requires a host-provided transcribe handler",
+              );
             return transcribe(args, config);
           }
           const result = await handleOpenllmTool(name, args, config);
           return name === MODELS_TOOL_NAME
             ? prioritizeSubscriptionModels(result)
             : result;
-        }
-        return {
-          content: [{ type: "text", text: `Unknown tool: ${name}` }],
-          isError: true,
-        };
+        },
       },
+      isMcpCoreTool(name),
     );
   }
-  if (upstreams.length > 0) {
-    attachMarketplaceUpstreams(
+  for (const tool of hostTools) {
+    addEntry(
       server,
-      upstreams,
-      new Set(tools.map((tool) => tool.name)),
+      state,
+      {
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        ...(tool.annotations === undefined
+          ? {}
+          : { annotations: tool.annotations }),
+        run: tool.run,
+      },
+      tool.listed,
     );
   }
+  if (upstreams.length > 0) attachMarketplaceUpstreams(server, upstreams);
+  else state.find.update({ description: findDescription(state) });
   return server;
 };
 
 /** Register marketplace proxy tools on a live server. Safe to call after
- *  listen — each `registerTool` notifies `tools/list_changed`. */
+ *  listen — each `registerTool` notifies `tools/list_changed`. The Memory
+ *  integration is listed (bar `whoAmI`); every other integration is found on demand. */
 export const attachMarketplaceUpstreams = (
   server: McpServer,
   upstreams: readonly TUpstream[],
-  alreadyRegistered: ReadonlySet<string> = new Set(),
 ): void => {
+  const state = lookupStates.get(server) ?? registerLookupTools(server);
   // A duplicate name or an unconvertible schema skips that one tool only —
   // a bad vendor manifest must never take the built-in tools down with it.
   const entries = upstreamToolEntries(upstreams, {
-    alreadyRegistered,
+    alreadyRegistered: state.registered,
     onDuplicate: (name) =>
       console.warn(`[MCP] marketplace: skipping duplicate tool ${name}`),
   });
   for (const { name, upstream, tool } of entries) {
     try {
-      const upstreamConfig = {
-        ...(tool.description === undefined
-          ? {}
-          : { description: tool.description }),
-        ...(tool.annotations === undefined
-          ? {}
-          : {
-              annotations: tool.annotations as {
-                readonly title?: string;
-                readonly readOnlyHint?: boolean;
-                readonly destructiveHint?: boolean;
-                readonly idempotentHint?: boolean;
-                readonly openWorldHint?: boolean;
-              },
-            }),
-        inputSchema: fromJsonSchema<Record<string, unknown>>(tool.inputSchema),
-      };
-      server.registerTool(
-        name,
-        upstreamConfig as unknown as Parameters<McpServer["registerTool"]>[1],
-        (args: Record<string, unknown>): Promise<CallToolResult> =>
-          upstream.call(tool.name, args),
+      // Validate the vendor schema up front, listed or deferred.
+      fromJsonSchema<Record<string, unknown>>(tool.inputSchema);
+      addEntry(
+        server,
+        state,
+        {
+          name,
+          description: tool.description ?? `${upstream.id}: ${tool.name}`,
+          inputSchema: tool.inputSchema,
+          ...(tool.annotations === undefined
+            ? {}
+            : { annotations: tool.annotations as TToolAnnotations }),
+          run: (args) => upstream.call(tool.name, args),
+        },
+        upstream.id === OPENLLM_MEMORY_ENTRY_ID &&
+          !MEMORY_DEFERRED_TOOLS.has(tool.name),
       );
     } catch (err) {
       console.warn(
@@ -236,6 +362,7 @@ export const attachMarketplaceUpstreams = (
       );
     }
   }
+  state.find.update({ description: findDescription(state) });
 };
 
 export type TLaunchConnected = {
