@@ -1395,6 +1395,7 @@ export const daemonPlanSigningPayload = (
   contextOverflowStrategy?: TContextOverflowStrategy | null,
   holdNonce?: string | null,
   maxOutputTokens?: number | null,
+  hopOutputLimits?: ReadonlyArray<number | null> | null,
 ): string => {
   if (holdNonce != null && !HOLD_NONCE_PATTERN.test(holdNonce)) {
     throw new Error("Invalid hold nonce");
@@ -1415,10 +1416,24 @@ export const daemonPlanSigningPayload = (
     holdNonce === undefined || holdNonce === null
       ? base
       : `${base}\nhold:${holdNonce}`;
+  if (
+    hopOutputLimits?.some(
+      (limit) => limit !== null && (!Number.isInteger(limit) || limit <= 0),
+    )
+  ) {
+    throw new Error("Invalid hop output limits");
+  }
   // The output budget only rides a held plan; `out:` can't collide either.
-  return maxOutputTokens === undefined || maxOutputTokens === null
-    ? held
-    : `${held}\nout:${maxOutputTokens}`;
+  const budgeted =
+    maxOutputTokens === undefined || maxOutputTokens === null
+      ? held
+      : `${held}\nout:${maxOutputTokens}`;
+  // A Fusion plan's per-hop hand-off ceilings, aligned with `plan`.
+  return hopOutputLimits === undefined ||
+    hopOutputLimits === null ||
+    hopOutputLimits.length === 0
+    ? budgeted
+    : `${budgeted}\nhop_out:${hopOutputLimits.map((limit) => limit ?? "").join(",")}`;
 };
 
 // ─── GET /api/daemon/plan (daemon → cloud) ───────────────────────────
@@ -1447,6 +1462,13 @@ export const DaemonPlanResponse = S.Struct({
   /** Largest output the hold allows (held plans only; signed). The daemon
    *  lowers the request's output limit to it before dispatch. */
   max_output_tokens: S.optional(S.Number.check(S.isInt(), S.isGreaterThan(0))),
+  /** Fusion plans only (signed): each hop's output ceiling, aligned with
+   *  `plan`; null for a hop that never hands off (the last step, fallbacks).
+   *  The daemon lowers the hop's output limit to it so a step stops near its
+   *  cutoff and the client's next request starts on the next step. */
+  hop_output_limits: S.optional(
+    S.Array(S.NullOr(S.Number.check(S.isInt(), S.isGreaterThan(0)))),
+  ),
   /** Revision of the key's access policy this plan was built under; a
    *  change drops the daemon's plan cache (see bootstrap `key_policy_rev`).
    *  Optional so a plan from a cloud that predates it still decodes; absent
