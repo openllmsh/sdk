@@ -81,20 +81,30 @@ export type TLookupEntry = {
   readonly inputSchema: Record<string, unknown>;
 };
 
-/** At most this many tools come back from one search, with schemas. */
-const FIND_LIMIT = 8;
+/** At most this many tools come back from one keyword search. */
+const FIND_LIMIT = 20;
+/** A search result's summary is cut past this many characters. */
+const SUMMARY_MAX = 160;
 
-/** The first sentence of a description, for the name-only listing. */
-const firstSentence = (text: string): string => {
-  const end = text.search(/[.!?](\s|$)/);
-  return end === -1 ? text : text.slice(0, end + 1);
-};
+/** The name and a short summary: what a search returns, never a schema. */
+const summaryOf = (
+  entry: TLookupEntry,
+): { readonly name: string; readonly summary: string } => ({
+  name: entry.name,
+  summary: cutText(
+    entry.description.replace(/\s+/g, " ").trim(),
+    SUMMARY_MAX,
+    "",
+  ).trimEnd(),
+});
 
 /**
- * {@link OPENLLM_API_FIND_TOOL}'s result over `entries`: an exact name
- * returns that tool; otherwise the tools whose name or description holds
- * every query word, best first, with their schemas; an empty query lists
- * every tool by name with a one-line summary.
+ * {@link OPENLLM_API_FIND_TOOL}'s result over `entries`. Searching is cheap:
+ * an empty query lists every tool and a keyword query the matching ones,
+ * best first, each as a name and a short summary only. Asking for an exact
+ * name returns that one tool's full, untruncated description and input
+ * schema — the only answer that carries a schema, so a lookup never pours
+ * every matching vendor schema into the context.
  */
 export const findLookupEntries = (
   entries: ReadonlyArray<TLookupEntry>,
@@ -112,25 +122,20 @@ export const findLookupEntries = (
       ],
     });
   }
+  if (query.trim() === "") {
+    return JSON.stringify({ tools: entries.map(summaryOf) });
+  }
   const words = query
     .toLowerCase()
     .split(/[^\p{L}\p{N}]+/u)
     .filter((w) => w.length > 0);
-  if (query.trim() === "") {
-    return JSON.stringify({
-      tools: entries.map((entry) => ({
-        name: entry.name,
-        summary: firstSentence(entry.description),
-      })),
-    });
-  }
   const scored = entries
     .map((entry) => {
       const name = entry.name.toLowerCase();
       const text = `${name} ${entry.description.toLowerCase()}`;
       const hits = words.filter((w) => text.includes(w));
       // Every word must appear somewhere; name hits rank above description.
-      return hits.length < words.length
+      return words.length === 0 || hits.length < words.length
         ? null
         : { entry, score: words.filter((w) => name.includes(w)).length };
     })
@@ -138,16 +143,11 @@ export const findLookupEntries = (
     .sort((a, b) => b.score - a.score)
     .slice(0, FIND_LIMIT);
   return JSON.stringify({
-    tools: scored.map(({ entry }) => ({
-      name: entry.name,
-      description: entry.description,
-      parameters: entry.inputSchema,
-    })),
-    ...(scored.length === 0
-      ? {
-          hint: "No tool matches every word. Try fewer words, or an empty query to list them all.",
-        }
-      : {}),
+    tools: scored.map(({ entry }) => summaryOf(entry)),
+    hint:
+      scored.length === 0
+        ? "No tool matches every word. Try fewer words, or an empty query to list them all."
+        : "Pass one exact name as the query to get its full description and input schema.",
   });
 };
 
@@ -190,7 +190,7 @@ export const lookupToolSpecs = (
 ): ReadonlyArray<TLookupEntry> => [
   {
     name: OPENLLM_API_FIND_TOOL,
-    description: `Find OpenLLM tools that are not listed (groups: ${groups.join(", ")}): account reads, local sign-in management and integrations. Search by keyword to get matching tools with their input schemas, then run one with ${OPENLLM_API_CALL_TOOL}. An exact tool name returns its full schema (a listed tool whose description was shortened is still called directly); an empty query lists every tool by name.`,
+    description: `Find OpenLLM tools that are not listed (groups: ${groups.join(", ")}): account reads, local sign-in management and integrations. An empty query lists every tool and a keyword query the matching ones, each as a name and short summary. Pass one exact name to get its full description and input schema, then run it with ${OPENLLM_API_CALL_TOOL} (a listed tool whose description was shortened is still called directly).`,
     inputSchema: {
       type: "object",
       properties: {
