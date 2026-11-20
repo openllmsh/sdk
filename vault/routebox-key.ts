@@ -24,13 +24,14 @@
  * imports that barrel, and a box only ever receives these keys. Import by
  * subpath: `@openllmsh/sdk/vault/routebox-key`.
  */
+
+import { getPublicKeyAsync } from "@noble/ed25519";
 import {
   OPENLLM_API_KEY_ID_BYTES,
   OPENLLM_API_KEY_SECRET_BYTES,
 } from "@openllmsh/sdk/protocol";
 import type { TMintedApiKey } from "./api-key";
 import { mintApiKeyFrom } from "./api-key";
-import { getPublicKeyAsync } from "@noble/ed25519";
 import { hkdfSha256, toB64, toB64Url, zero } from "./crypto";
 import { DEVICE_CONTROL_SEED_BYTES } from "./device-control";
 

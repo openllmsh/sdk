@@ -15,6 +15,7 @@ export {
   isOpenllmTool,
   LOCAL_TRANSCRIPTION_TIMEOUT_MS,
   MAX_TRANSCRIPTION_BYTES,
+  openllmAdminToolDefs,
   openllmToolDefs,
   openllmToolDefsAll,
   TRANSCRIPTION_TIMEOUT_MS,

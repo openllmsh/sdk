@@ -11,6 +11,7 @@ export {
   LOCAL_TRANSCRIPTION_TIMEOUT_MS,
   MAX_TRANSCRIPTION_BYTES,
   MODELS_TOOL_NAME,
+  openllmAdminToolDefs,
   openllmToolDefs,
   openllmToolDefsAll,
   prioritizeSubscriptionModels,

@@ -23,6 +23,7 @@ import {
   OPENLLM_RESOLVED_MODEL_HEADER,
   unwrapKeepaliveResponse,
 } from "@openllmsh/sdk/protocol";
+import { isAdminOperationPath } from "../tool-lookup";
 import type { TToolResult } from "../types";
 import { MODELS_TOOL_NAME } from "./model-priority";
 
@@ -274,13 +275,6 @@ const SESSION_ONLY_PATHS: ReadonlySet<string> = new Set([
   "/vault/migrate/rows",
 ]);
 
-/** Gateway-admin dashboards (`requireAdmin`): cross-user aggregates no agent
- *  acting for one user should be offered. */
-const ADMIN_ONLY_PATHS: ReadonlySet<string> = new Set([
-  "/stats/admin",
-  "/stats/admin/value",
-]);
-
 /** Browser/ops plumbing with no use to an agent: listing them only spends
  *  its context. */
 const NOT_FOR_AGENTS_PATHS: ReadonlySet<string> = new Set([
@@ -343,7 +337,8 @@ const isMcpExposed = (op: TApiOperation): boolean => {
   if (GRAVITY_INDEX_TOOLS.has(toolNameFor(op))) return true;
   if (MUTATING.has(op.method) && !op.path.startsWith("/v1/")) return false;
   if (SESSION_ONLY_PATHS.has(op.path)) return false;
-  if (ADMIN_ONLY_PATHS.has(op.path)) return false;
+  // Gateway-admin operations: offered to admins only (`openllmAdminToolDefs`).
+  if (isAdminOperationPath(op.path)) return false;
   if (NOT_FOR_AGENTS_PATHS.has(op.path)) return false;
   return true;
 };
@@ -367,6 +362,13 @@ const toolDef = (op: TApiOperation): TToolDef => ({
  *  browser chat tool bridge (`lib/chat/tools.ts`), which intentionally
  *  exposes inference + account ops for in-chat delegation. */
 export const openllmToolDefsAll = AGENT_OPERATIONS.map(toolDef);
+
+/** Gateway-admin operations (`requireAdmin`, cross-user aggregates). A host
+ *  offers them only to an admin caller, found on demand; the gateway refuses
+ *  anyone else either way. */
+export const openllmAdminToolDefs = AGENT_OPERATIONS.filter((op) =>
+  isAdminOperationPath(op.path),
+).map(toolDef);
 
 /** Browser-safe identification/limit shared with the CLI-only local adapter. */
 export const TRANSCRIPTION_TOOL_NAME = "api_v1Audio_transcriptions";

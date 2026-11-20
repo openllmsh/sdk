@@ -43,16 +43,6 @@ const CORE_OPERATION_GROUPS: ReadonlySet<string> = new Set([
   "gravity",
 ]);
 
-/** Listed in the browser chat, found on demand over MCP: video-job
- *  follow-ups (the chat tracks jobs itself) and a provider's raw model list
- *  (`api_v1Models_list` already answers "what can I use"). */
-const MCP_DEFERRED_CORE_TOOLS: ReadonlySet<string> = new Set([
-  "api_v1Videos_videosRetrieve",
-  "api_v1Videos_videosContent",
-  "api_v1Videos_videosDelete",
-  "api_providerModels_list",
-]);
-
 /** `api_<group>_<action>` → `<group>`; `<upstream>__<tool>` → `<upstream>`. */
 export const toolGroupOf = (name: string): string => {
   const upstream = name.indexOf("__");
@@ -60,13 +50,10 @@ export const toolGroupOf = (name: string): string => {
   return name.replace(/^api_/, "").split("_")[0] ?? name;
 };
 
-/** True for a native-API operation a host lists as a tool. */
+/** True for a native-API operation in a core group (the catalog lists
+ *  these, bar a few follow-ups — `isListedOperation` in `./tool-catalog`). */
 export const isCoreTool = (name: string): boolean =>
   CORE_OPERATION_GROUPS.has(toolGroupOf(name));
-
-/** True for a native-API operation `openllm mcp` lists as a tool. */
-export const isMcpCoreTool = (name: string): boolean =>
-  isCoreTool(name) && !MCP_DEFERRED_CORE_TOOLS.has(name);
 
 /** Gateway-admin operations (`requireAdmin`): offered to admins only. */
 const ADMIN_PATH = /^\/(admin|stats\/admin)(\/|$)/;
@@ -243,9 +230,6 @@ const DEFAULT_LIMITS: TCompactionLimits = {
   tool: TOOL_DESCRIPTION_MAX,
   param: PARAM_DESCRIPTION_MAX,
 };
-
-/** `openllm mcp`'s listed tools: every full text is one find away. */
-export const MCP_LISTING_LIMITS: TCompactionLimits = { tool: 300, param: 100 };
 
 /** Keys whose values are data, not schema: never rewritten. */
 const DATA_KEYS: ReadonlySet<string> = new Set([
