@@ -35,6 +35,7 @@ const API_KEY_SHARE_PROVIDERS: ReadonlySet<string> = new Set([
   "openrouter",
   "cloudflare",
   "sambanova",
+  "surplus",
   "google",
   "zai",
   "minimax",

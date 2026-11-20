@@ -10,6 +10,7 @@ export const MODEL_SELECTABLE_PROVIDERS: ReadonlySet<string> = new Set([
   "cloudflare",
   "ollama_cloud",
   "opencode_zen",
+  "surplus",
 ]);
 
 export const isModelSelectableProvider = (provider: string): boolean =>
