@@ -1157,6 +1157,18 @@ export const API_OPERATIONS: readonly TApiOperation[] = [
     "hasBody": false
   },
   {
+    "id": "stats.devices",
+    "method": "get",
+    "path": "/stats/devices",
+    "summary": "",
+    "tags": [
+      "stats"
+    ],
+    "pathParams": [],
+    "queryParams": [],
+    "hasBody": false
+  },
+  {
     "id": "stats.key",
     "method": "get",
     "path": "/stats/keys/{id}",
