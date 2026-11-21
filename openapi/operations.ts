@@ -1308,6 +1308,31 @@ export const API_OPERATIONS: readonly TApiOperation[] = [
     "hasBody": false
   },
   {
+    "id": "stats.usage",
+    "method": "get",
+    "path": "/stats/usage",
+    "summary": "",
+    "tags": [
+      "stats"
+    ],
+    "pathParams": [],
+    "queryParams": [
+      {
+        "name": "keyId",
+        "required": false
+      },
+      {
+        "name": "range",
+        "required": false
+      },
+      {
+        "name": "tz",
+        "required": false
+      }
+    ],
+    "hasBody": false
+  },
+  {
     "id": "teams.list",
     "method": "get",
     "path": "/teams",
