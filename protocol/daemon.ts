@@ -17,6 +17,7 @@ import {
 } from "./local-device-control";
 import { LocalKeyProviderSlug } from "./local-provider";
 import {
+  MinReasoningEffort,
   ModelSettingDefinitions,
   ModelSettingsOverrides,
 } from "./model-settings";
@@ -84,6 +85,8 @@ export const DaemonCatalogEntry = S.Struct({
   audio_support: S.optional(ModelAudioSupport),
   /** Optional so older clouds keep bootstrapping newer daemons. */
   strip_subagent_isolation: S.optional(S.Boolean),
+  /** The catalog's `served_efforts`: the daemon pins `<id>-<effort>`. */
+  served_efforts: S.optional(S.Array(MinReasoningEffort)),
 });
 export type TDaemonCatalogEntry = S.Schema.Type<typeof DaemonCatalogEntry>;
 

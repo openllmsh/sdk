@@ -76282,6 +76282,25 @@
                               }
                             ]
                           },
+                          "served_efforts": {
+                            "anyOf": [
+                              {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "enum": [
+                                    "low",
+                                    "medium",
+                                    "high",
+                                    "xhigh"
+                                  ]
+                                }
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "pricing": {
                             "anyOf": [
                               {
