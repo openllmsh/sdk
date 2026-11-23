@@ -22,7 +22,7 @@ import { isLocalProvider } from "./local-provider";
  * OAuth / local slugs are excluded (they use `device_model`). Non-chat
  * surfaces (search, embed-only) are filtered at the catalog/UI layer.
  */
-const API_KEY_SHARE_PROVIDERS: ReadonlySet<string> = new Set([
+export const API_KEY_SHARE_PROVIDER_SLUGS: ReadonlyArray<string> = [
   "openai",
   "anthropic",
   "alibaba",
@@ -39,7 +39,11 @@ const API_KEY_SHARE_PROVIDERS: ReadonlySet<string> = new Set([
   "google",
   "zai",
   "minimax",
-]);
+];
+
+const API_KEY_SHARE_PROVIDERS: ReadonlySet<string> = new Set(
+  API_KEY_SHARE_PROVIDER_SLUGS,
+);
 
 const CUSTOM_PROVIDER_RE = /^custom:[a-z0-9][a-z0-9-]{0,62}$/;
 
