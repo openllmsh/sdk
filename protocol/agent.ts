@@ -68,6 +68,7 @@ export const AGENT_HOOK_LOCAL_PATH = "/local/agent-hook";
  * Claude hook events `openllm exec agent hook` forwards. `SessionStart` is the
  * engine's readiness signal: Claude runs it once the TUI is up (after any
  * folder-trust dialog), so a queued web prompt is pasted only then.
+ * `Elicitation` is an MCP server asking the user for input (a form or a URL).
  */
 export const AGENT_HOOK_EVENTS = [
   "PermissionRequest",
@@ -75,6 +76,7 @@ export const AGENT_HOOK_EVENTS = [
   "Stop",
   "SessionStart",
   "UserPromptSubmit",
+  "Elicitation",
 ] as const;
 
 /** Max inline attachments on one `send`. */
@@ -845,6 +847,12 @@ export const AgentRequestOpenedEvent = S.Struct({
   title: S.optional(ShortText),
   detail: S.optional(DetailText),
   input: S.optional(S.Unknown),
+  /**
+   * The request is answered by typing into the engine's own terminal dialog
+   * (re-emitted under the same id when it is handed over), where "accept for
+   * session" cannot be applied: clients offer a single allow.
+   */
+  dialog: S.optional(S.Boolean),
 });
 
 export const AgentRequestResolvedEvent = S.Struct({
@@ -881,6 +889,11 @@ export const AgentUserInputRequestedEvent = S.Struct({
     S.isMinLength(1),
     S.isMaxLength(16),
   ),
+  /**
+   * The asker accepts a refusal: a `respond` with `decision: "decline"` (and
+   * no answers) declines it (an MCP elicitation).
+   */
+  dismissible: S.optional(S.Boolean),
 });
 
 export const AgentUserInputResolvedEvent = S.Struct({
