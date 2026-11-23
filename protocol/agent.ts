@@ -391,6 +391,12 @@ export const AgentRespondCommand = S.Struct({
   request_id: AgentRefId,
   decision: S.optional(AgentRequestDecision),
   answers: S.optional(AgentUserInputAnswers),
+  /**
+   * Why a `decline` was declined, handed to the engine as the denial reason
+   * (Claude tells the model "The user declined this tool call and said: …").
+   * Ignored on any other decision.
+   */
+  feedback: S.optional(S.String.check(S.isMaxLength(2000))),
 }).check(
   S.makeFilter(
     (command) =>
