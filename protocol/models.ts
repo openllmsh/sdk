@@ -1,7 +1,7 @@
 import { Schema as S } from "effect";
 import { LocalProviderVariant } from "./local-provider";
 import { OptionalVideoReferences } from "./media-input";
-import { ModelSettingDefinitions } from "./model-settings";
+import { MinReasoningEffort, ModelSettingDefinitions } from "./model-settings";
 
 export const ModelCapability = S.Literals([
   "chat",
@@ -667,6 +667,14 @@ export const ExtendedModel = S.Struct({
    * the response. Catalog-owned; not part of the public `/v1/models` card.
    */
   strip_subagent_isolation: S.optional(S.Boolean),
+  /**
+   * The thinking efforts a provider serves this model at as separate ids
+   * (`<provider_model_id>-<effort>`, Antigravity's Gemini families). Set
+   * only on such a card: the daemon pins `<id>-<effort>` from the request's
+   * effort. Absent → the id is served verbatim, whatever effort controls
+   * the settings UI offers. Catalog-owned; not on the public card.
+   */
+  served_efforts: S.optional(S.Array(MinReasoningEffort)),
   pricing: S.optional(ModelPricing),
   /**
    * Subscription models only: what the same tokens would cost at

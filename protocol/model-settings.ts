@@ -305,23 +305,43 @@ export const synthesizeInputTokenLimitSetting = (params: {
   };
 };
 
-const MIN_REASONING_EFFORT_SETTING: TModelSettingDefinitions["min_reasoning_effort"] =
-  {
-    label: "Minimum effort",
-    description:
-      "Default uses whatever effort the caller requested. Pick a level to raise lower requests to it; a request asking for more keeps its own, and one turning reasoning off is left alone.",
-    options: [
-      { value: "low", label: "Low" },
-      { value: "medium", label: "Medium" },
-      { value: "high", label: "High" },
-      { value: "xhigh", label: "Extra high" },
-    ],
-  };
+const EFFORT_LABELS: Readonly<Record<TMinReasoningEffort, string>> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "Extra high",
+};
 
-/** The effort-floor control exists on every reasoning-capable model. */
+/**
+ * The effort-floor control offering exactly `levels`. A model whose provider
+ * serves only some levels (Antigravity's thinking families) authors its own;
+ * every other reasoning model offers all four.
+ */
+export const minReasoningEffortSettingFor = (
+  levels: ReadonlyArray<TMinReasoningEffort>,
+): NonNullable<TModelSettingDefinitions["min_reasoning_effort"]> => ({
+  label: "Minimum effort",
+  description:
+    "Default uses whatever effort the caller requested. Pick a level to raise lower requests to it; a request asking for more keeps its own, and one turning reasoning off is left alone.",
+  options: levels.map((value) => ({ value, label: EFFORT_LABELS[value] })),
+});
+
+const MIN_REASONING_EFFORT_SETTING = minReasoningEffortSettingFor([
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+]);
+
+/**
+ * The effort-floor control exists on every reasoning-capable model; a catalog
+ * entry that authors its own (a narrower level list) keeps it.
+ */
 export const synthesizeMinReasoningEffortSetting = (
   capabilities: ReadonlyArray<string> | undefined,
+  authored?: TModelSettingDefinitions["min_reasoning_effort"],
 ): TModelSettingDefinitions["min_reasoning_effort"] | undefined =>
-  capabilities?.includes("reasoning") === true
+  authored ??
+  (capabilities?.includes("reasoning") === true
     ? MIN_REASONING_EFFORT_SETTING
-    : undefined;
+    : undefined);
