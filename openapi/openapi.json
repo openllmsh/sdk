@@ -72063,6 +72063,7 @@
                 {
                   "type": "string",
                   "enum": [
+                    "all",
                     "today",
                     "7d",
                     "14d",
@@ -72104,6 +72105,7 @@
                     "range": {
                       "type": "string",
                       "enum": [
+                        "all",
                         "today",
                         "7d",
                         "14d",
