@@ -1695,6 +1695,18 @@ export const API_OPERATIONS: readonly TApiOperation[] = [
     "hasBody": true
   },
   {
+    "id": "user.detectedPlans",
+    "method": "get",
+    "path": "/user/detected-plans",
+    "summary": "",
+    "tags": [
+      "user"
+    ],
+    "pathParams": [],
+    "queryParams": [],
+    "hasBody": false
+  },
+  {
     "id": "user.dismissOnboarding",
     "method": "post",
     "path": "/user/dismiss-onboarding",
