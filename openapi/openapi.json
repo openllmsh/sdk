@@ -72245,6 +72245,16 @@
                         "additionalProperties": false
                       }
                     },
+                    "first_day": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "compare": {
                       "type": "object",
                       "properties": {
@@ -72504,6 +72514,7 @@
                     "cache_creation_tokens",
                     "saved_usd",
                     "api_value",
+                    "first_day",
                     "compare",
                     "buckets",
                     "by_model",
