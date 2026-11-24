@@ -57,6 +57,18 @@ export const API_OPERATIONS: readonly TApiOperation[] = [
     "hasBody": true
   },
   {
+    "id": "billing.confirmCheckout",
+    "method": "post",
+    "path": "/billing/checkout/confirm",
+    "summary": "",
+    "tags": [
+      "billing"
+    ],
+    "pathParams": [],
+    "queryParams": [],
+    "hasBody": true
+  },
+  {
     "id": "billing.history",
     "method": "get",
     "path": "/billing/history",
@@ -72,6 +84,18 @@ export const API_OPERATIONS: readonly TApiOperation[] = [
     "id": "billing.portal",
     "method": "post",
     "path": "/billing/portal",
+    "summary": "",
+    "tags": [
+      "billing"
+    ],
+    "pathParams": [],
+    "queryParams": [],
+    "hasBody": false
+  },
+  {
+    "id": "billing.welcomeSeen",
+    "method": "post",
+    "path": "/billing/welcome-seen",
     "summary": "",
     "tags": [
       "billing"

@@ -278,6 +278,8 @@ const SESSION_ONLY_PATHS: ReadonlySet<string> = new Set([
 /** Browser/ops plumbing with no use to an agent: listing them only spends
  *  its context. */
 const NOT_FOR_AGENTS_PATHS: ReadonlySet<string> = new Set([
+  "/billing/checkout/confirm",
+  "/billing/welcome-seen",
   "/cookie-consent/region",
   "/health",
   "/public/usage-index",
