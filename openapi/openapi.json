@@ -80356,37 +80356,51 @@
                     ]
                   },
                   "source": {
-                    "type": "string",
-                    "enum": [
-                      "chat_ads",
-                      "token_cap",
-                      "near_token_cap",
-                      "device_cap",
-                      "sidebar",
-                      "account_menu",
-                      "top_bar",
-                      "fusion_chat",
-                      "fusion_chain",
-                      "routebox_get_started",
-                      "routebox_tile",
-                      "device_limit",
-                      "plan_tab",
-                      "pro_trial_intent",
-                      "lapse_toast"
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "chat_ads",
+                          "token_cap",
+                          "near_token_cap",
+                          "device_cap",
+                          "sidebar",
+                          "account_menu",
+                          "top_bar",
+                          "fusion_chat",
+                          "fusion_chain",
+                          "routebox_get_started",
+                          "routebox_tile",
+                          "device_limit",
+                          "plan_tab",
+                          "pro_trial_intent",
+                          "lapse_toast"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "return_path": {
-                    "type": "string",
-                    "enum": [
-                      "/overview",
-                      "/chat",
-                      "/keys",
-                      "/config",
-                      "/providers",
-                      "/integrations",
-                      "/get-started",
-                      "/teams",
-                      "/settings/plan"
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "/overview",
+                          "/chat",
+                          "/keys",
+                          "/config",
+                          "/providers",
+                          "/integrations",
+                          "/get-started",
+                          "/teams",
+                          "/settings/plan"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "return_session": {
@@ -80401,9 +80415,7 @@
                   }
                 },
                 "required": [
-                  "plan",
-                  "source",
-                  "return_path"
+                  "plan"
                 ],
                 "additionalProperties": false
               }
