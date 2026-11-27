@@ -23217,7 +23217,8 @@
                                   "go_pro",
                                   "plan_tile",
                                   "checkout",
-                                  "email"
+                                  "email",
+                                  "app_toast"
                                 ]
                               }
                             }
@@ -79535,7 +79536,8 @@
                                 "device_limit",
                                 "plan_tab",
                                 "pro_trial_intent",
-                                "lapse_toast"
+                                "lapse_toast",
+                                "campaign_toast"
                               ]
                             }
                           },
@@ -79610,7 +79612,8 @@
                                   "go_pro",
                                   "plan_tile",
                                   "checkout",
-                                  "email"
+                                  "email",
+                                  "app_toast"
                                 ]
                               }
                             }
@@ -81062,7 +81065,8 @@
                           "device_limit",
                           "plan_tab",
                           "pro_trial_intent",
-                          "lapse_toast"
+                          "lapse_toast",
+                          "campaign_toast"
                         ]
                       },
                       {
@@ -81609,7 +81613,8 @@
                                 "device_limit",
                                 "plan_tab",
                                 "pro_trial_intent",
-                                "lapse_toast"
+                                "lapse_toast",
+                                "campaign_toast"
                               ]
                             }
                           },
@@ -81684,7 +81689,8 @@
                                   "go_pro",
                                   "plan_tile",
                                   "checkout",
-                                  "email"
+                                  "email",
+                                  "app_toast"
                                 ]
                               }
                             }
@@ -82636,7 +82642,8 @@
                                 "device_limit",
                                 "plan_tab",
                                 "pro_trial_intent",
-                                "lapse_toast"
+                                "lapse_toast",
+                                "campaign_toast"
                               ]
                             }
                           },
@@ -82711,7 +82718,8 @@
                                   "go_pro",
                                   "plan_tile",
                                   "checkout",
-                                  "email"
+                                  "email",
+                                  "app_toast"
                                 ]
                               }
                             }
