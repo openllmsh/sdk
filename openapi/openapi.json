@@ -23237,10 +23237,50 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "price": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "unit_amount": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            "currency": {
+                              "type": "string"
+                            },
+                            "interval": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "unit_amount",
+                            "currency",
+                            "interval"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
-                    "campaign"
+                    "campaign",
+                    "price"
                   ],
                   "additionalProperties": false
                 }
