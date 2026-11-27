@@ -80949,6 +80949,17 @@
                       }
                     ]
                   },
+                  "campaign_id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "gravity": {
                     "anyOf": [
                       {
