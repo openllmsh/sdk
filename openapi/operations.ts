@@ -949,6 +949,18 @@ export const API_OPERATIONS: readonly TApiOperation[] = [
     "hasBody": true
   },
   {
+    "id": "publicCampaign.campaign",
+    "method": "get",
+    "path": "/public/campaign",
+    "summary": "",
+    "tags": [
+      "publicCampaign"
+    ],
+    "pathParams": [],
+    "queryParams": [],
+    "hasBody": false
+  },
+  {
     "id": "publicUsageIndex.usageIndex",
     "method": "get",
     "path": "/public/usage-index",

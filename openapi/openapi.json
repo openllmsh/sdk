@@ -23140,6 +23140,164 @@
         }
       }
     },
+    "/public/campaign": {
+      "get": {
+        "tags": [
+          "publicCampaign"
+        ],
+        "operationId": "publicCampaign.campaign",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "campaign": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            },
+                            "headline": {
+                              "type": "string"
+                            },
+                            "ends_at": {
+                              "type": "string"
+                            },
+                            "percent_off": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            "duration_in_months": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "surfaces": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "landing_strip",
+                                  "pricing",
+                                  "top_bar",
+                                  "go_pro",
+                                  "plan_tile",
+                                  "checkout",
+                                  "email"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "label",
+                            "headline",
+                            "ends_at",
+                            "percent_off",
+                            "duration_in_months",
+                            "surfaces"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "campaign"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "code": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/keys": {
       "get": {
         "tags": [
@@ -79350,6 +79508,88 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "campaign": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            },
+                            "headline": {
+                              "type": "string"
+                            },
+                            "ends_at": {
+                              "type": "string"
+                            },
+                            "percent_off": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            "duration_in_months": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "surfaces": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "landing_strip",
+                                  "pricing",
+                                  "top_bar",
+                                  "go_pro",
+                                  "plan_tile",
+                                  "checkout",
+                                  "email"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "label",
+                            "headline",
+                            "ends_at",
+                            "percent_off",
+                            "duration_in_months",
+                            "surfaces"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -79370,7 +79610,8 @@
                     "included_usage",
                     "device_cap",
                     "device_count",
-                    "pro_welcome"
+                    "pro_welcome",
+                    "campaign"
                   ],
                   "additionalProperties": false
                 }
@@ -81330,6 +81571,88 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "campaign": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            },
+                            "headline": {
+                              "type": "string"
+                            },
+                            "ends_at": {
+                              "type": "string"
+                            },
+                            "percent_off": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            "duration_in_months": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "surfaces": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "landing_strip",
+                                  "pricing",
+                                  "top_bar",
+                                  "go_pro",
+                                  "plan_tile",
+                                  "checkout",
+                                  "email"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "label",
+                            "headline",
+                            "ends_at",
+                            "percent_off",
+                            "duration_in_months",
+                            "surfaces"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -81350,7 +81673,8 @@
                     "included_usage",
                     "device_cap",
                     "device_count",
-                    "pro_welcome"
+                    "pro_welcome",
+                    "campaign"
                   ],
                   "additionalProperties": false
                 }
@@ -82274,6 +82598,88 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "campaign": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            },
+                            "headline": {
+                              "type": "string"
+                            },
+                            "ends_at": {
+                              "type": "string"
+                            },
+                            "percent_off": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            "duration_in_months": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "surfaces": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "landing_strip",
+                                  "pricing",
+                                  "top_bar",
+                                  "go_pro",
+                                  "plan_tile",
+                                  "checkout",
+                                  "email"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "label",
+                            "headline",
+                            "ends_at",
+                            "percent_off",
+                            "duration_in_months",
+                            "surfaces"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -82294,7 +82700,8 @@
                     "included_usage",
                     "device_cap",
                     "device_count",
-                    "pro_welcome"
+                    "pro_welcome",
+                    "campaign"
                   ],
                   "additionalProperties": false
                 }
@@ -88362,6 +88769,9 @@
     },
     {
       "name": "publicUsageIndex"
+    },
+    {
+      "name": "publicCampaign"
     },
     {
       "name": "keys"

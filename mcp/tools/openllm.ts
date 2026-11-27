@@ -282,6 +282,7 @@ const NOT_FOR_AGENTS_PATHS: ReadonlySet<string> = new Set([
   "/billing/welcome-seen",
   "/cookie-consent/region",
   "/health",
+  "/public/campaign",
   "/public/usage-index",
   "/version",
 ]);
